@@ -1,0 +1,79 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "tick light",
+      "intents": [
+        {
+          "name": "CaptureIntent",
+          "slots": [{"name": "text", "type": "AMAZON.SearchQuery"}],
+          "samples": [
+            "add {text}",
+            "to add {text}",
+            "remember {text}",
+            "to remember {text}",
+            "remind me to {text}",
+            "i need to {text}",
+            "note {text}",
+            "capture {text}",
+            "brain dump {text}"
+          ]
+        },
+        {
+          "name": "NextIntent",
+          "slots": [],
+          "samples": [
+            "what's next",
+            "what is next",
+            "what should i do",
+            "what should i do next",
+            "what's my focus",
+            "what are my tasks",
+            "what's on my list"
+          ]
+        },
+        {
+          "name": "DoneIntent",
+          "slots": [{"name": "task", "type": "AMAZON.SearchQuery"}],
+          "samples": [
+            "i finished {task}",
+            "i did {task}",
+            "i'm done with {task}",
+            "mark done {task}",
+            "tick off {task}",
+            "complete {task}"
+          ]
+        },
+        {
+          "name": "MedsIntent",
+          "slots": [],
+          "samples": [
+            "i took my meds",
+            "i took my medication",
+            "i took my pills",
+            "meds taken",
+            "i've taken my meds"
+          ]
+        },
+        {
+          "name": "FocusIntent",
+          "slots": [{"name": "minutes", "type": "AMAZON.NUMBER"}],
+          "samples": [
+            "start a focus session",
+            "start focusing",
+            "start a {minutes} minute focus",
+            "start a {minutes} minute focus session",
+            "focus for {minutes} minutes",
+            "body double me",
+            "keep me company"
+          ]
+        },
+        {"name": "AMAZON.HelpIntent", "samples": []},
+        {"name": "AMAZON.StopIntent", "samples": []},
+        {"name": "AMAZON.CancelIntent", "samples": []},
+        {"name": "AMAZON.NavigateHomeIntent", "samples": []},
+        {"name": "AMAZON.FallbackIntent", "samples": []}
+      ],
+      "types": []
+    }
+  }
+}

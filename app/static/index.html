@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f1115">
+<title>Ticklight</title>
+<link rel="icon" href="/static/icons/icon-192.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="/static/style.css">
+<script>
+  // Apply theme before paint to avoid a flash
+  (function () {
+    var q = new URLSearchParams(location.search).get("theme");
+    if (q) localStorage.setItem("ticklight-theme", q);
+    var t = localStorage.getItem("ticklight-theme");
+    if (t ? t === "light" : matchMedia("(prefers-color-scheme: light)").matches)
+      document.documentElement.classList.add("light");
+  })();
+</script>
+</head>
+<body>
+<header>
+  <div class="clock"><div id="time">--:--</div><div id="date"></div></div>
+
+  <form id="capture" autocomplete="off">
+    <div class="capture-row">
+      <textarea id="capture-input" rows="1" placeholder="Dump anything on your mind. I'll sort it."></textarea>
+      <button type="button" id="btn-mic" title="Voice note (v)">🎙</button>
+    </div>
+    <div id="capture-status" class="muted small"></div>
+  </form>
+
+  <div class="side">
+    <div id="level" title="Level and XP">
+      <div class="level-row"><span id="level-num">Lv 1</span><span id="xp-today" class="muted small"></span></div>
+      <div class="bar"><div id="xp-bar"></div></div>
+      <button id="btn-game" class="game-row" title="Challenges, shop, wardrobe, badges (g)">
+        <span id="g-coins">🪙 0</span><span id="g-streak">🔥 0</span><span id="g-freezes" title="Streak freezes">❄️ 0</span><span id="g-claim" hidden>🎖</span>
+      </button>
+    </div>
+    <div id="energy" class="pills" title="Your energy right now (e)">
+      <button data-e="1" title="Low energy">🪫</button>
+      <button data-e="2" title="Medium energy">🔋</button>
+      <button data-e="3" title="High energy">⚡</button>
+    </div>
+    <div class="tools">
+      <button id="btn-session" title="Focus session with your companion (s)">⏱</button>
+      <button id="btn-hf" title="Hyperfocus: only meetings, meds, meals and deadlines get through (h)">🎧<span id="hf-left"></span></button>
+      <button id="btn-someday" title="Someday">📦 <span id="someday-count">0</span></button>
+      <button id="btn-new" title="New task with details (n)">＋</button>
+      <button id="btn-theme" title="Light / dark (t)">◐</button>
+      <button id="btn-display" title="Display mode (d)">⛶</button>
+      <button id="btn-settings" title="Devices and login">⚙</button>
+    </div>
+  </div>
+</header>
+
+<div id="banners"></div>
+
+<main>
+  <section id="focus-col">
+    <h2>Focus <span id="energy-label" class="muted small"></span></h2>
+    <div id="focus"></div>
+  </section>
+
+  <section id="list-col">
+    <div class="col" id="people-card" hidden>
+      <h2>💞 People</h2>
+      <div id="people-list"></div>
+    </div>
+    <div class="col">
+      <h2>Today</h2>
+      <ul id="today" class="list"></ul>
+    </div>
+    <div class="col">
+      <h2>Coming up</h2>
+      <ul id="upcoming" class="list"></ul>
+    </div>
+    <div class="col">
+      <h2 class="toggle" id="anytime-toggle">Anytime <span id="anytime-count" class="muted small"></span> <span class="caret">▸</span></h2>
+      <ul id="anytime" class="list" hidden></ul>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div id="done-strip"></div>
+</footer>
+
+<div id="toasts"></div>
+
+<!-- companion (always there, bottom right) -->
+<div id="buddy" title="Your coach. Click to change.">
+  <div id="buddy-bubble" hidden></div>
+  <div id="buddy-avatar"></div>
+</div>
+<button id="session-pill" hidden></button>
+
+<!-- focus session overlay -->
+<section id="session" hidden>
+  <div class="s-top">
+    <span id="s-label" class="muted"></span>
+    <span class="spacer"></span>
+    <select id="s-sound" title="Ambient sound">
+      <option value="off">🔇 No sound</option><option value="brown">🌊 Brown noise</option>
+      <option value="rain">🌧 Rain</option><option value="cafe">☕ Café</option><option value="hum">🌀 Low hum</option>
+    </select>
+    <input id="s-volume" type="range" min="0" max="1" step="0.05" value="0.4" title="Volume">
+    <button id="s-min" title="Back to the dashboard (session keeps running)">▾</button>
+  </div>
+  <div class="s-main">
+    <div class="s-timer">
+      <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54" class="track"/><circle cx="60" cy="60" r="54" class="ring" id="s-ring"/></svg>
+      <div class="s-time"><div id="s-clock">25:00</div><div id="s-sub" class="muted small"></div></div>
+    </div>
+    <div class="s-side">
+      <div id="s-task" class="s-task"></div>
+      <div id="s-step"></div>
+      <div class="s-companion"><div id="s-avatar"></div><div id="s-bubble" class="bubble"></div></div>
+      <div id="s-checkin" class="choices" hidden>
+        <button data-mood="good">👍 Going well</button>
+        <button data-mood="stuck">😵 Stuck</button>
+        <button data-mood="distracted">🐿 Got distracted</button>
+      </div>
+    </div>
+  </div>
+  <div id="s-controls" class="s-controls"></div>
+</section>
+
+<!-- start a session -->
+<dialog id="start-session">
+  <form method="dialog" id="start-form">
+    <h2>⏱ Focus session</h2>
+    <p class="muted small">Your companion keeps you company and checks in. Notifications go quiet except the important ones.</p>
+    <label class="small muted">Working on</label>
+    <select id="ss-task"></select>
+    <input id="ss-intention" placeholder="Or just say what you'll do (e.g. clear my inbox)">
+    <label class="small muted">How long?</label>
+    <div class="choices" id="ss-minutes"></div>
+    <div class="row"><span class="spacer"></span><button value="cancel" formnovalidate>Cancel</button>
+      <button id="ss-go" value="go" class="primary">▶ Start</button></div>
+  </form>
+</dialog>
+<div id="levelup" hidden><div class="burst">🎉</div><div id="levelup-text"></div></div>
+
+<!-- task editor -->
+<dialog id="edit">
+  <form method="dialog" id="edit-form">
+    <input name="title" class="big" placeholder="Task" required>
+    <div class="grid">
+      <label>Date <input type="date" name="due_date"></label>
+      <label>Time <input type="time" name="due_time"></label>
+      <label>Area
+        <select name="area"><option value="">–</option><option>work</option><option>home</option><option>money</option><option>health</option><option>people</option><option>fun</option></select>
+      </label>
+      <label>Energy
+        <select name="energy"><option value="">–</option><option value="1">🪫 low</option><option value="2">🔋 medium</option><option value="3">⚡ high</option></select>
+      </label>
+      <label>Minutes <input type="number" name="minutes" min="1" max="1440"></label>
+      <label>Priority
+        <select name="priority"><option value="0">low</option><option value="1">normal</option><option value="2">high</option></select>
+      </label>
+    </div>
+    <div id="edit-repeat" class="muted small"></div>
+    <label class="share-row"><input type="checkbox" name="shared"> 🏠 Shared with your people (either of you can tick it)</label>
+    <textarea name="notes" rows="2" placeholder="Notes"></textarea>
+    <h3>Steps <button type="button" id="edit-breakdown" class="link">🪜 break it down</button></h3>
+    <ul id="edit-steps" class="steps"></ul>
+    <input id="edit-step-input" placeholder="Add a step (paste several lines to add many)">
+    <div class="row">
+      <button type="button" id="edit-delete" class="danger">Delete</button>
+      <button type="button" id="edit-someday">📦 Someday</button>
+      <span class="spacer"></span>
+      <button value="cancel" formnovalidate>Cancel</button>
+      <button id="edit-save" value="save" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- someday -->
+<dialog id="someday">
+  <form method="dialog">
+    <h2>Someday</h2>
+    <p class="muted small">Parked, not forgotten. Nothing here is late.</p>
+    <ul id="someday-list" class="list"></ul>
+    <div class="row"><span class="spacer"></span><button class="primary">Close</button></div>
+  </form>
+</dialog>
+
+<!-- settings -->
+<dialog id="settings">
+  <form method="dialog">
+    <nav class="tabs">
+      <button type="button" data-tab="coach">Coach</button>
+      <button type="button" data-tab="routines" class="on">Routines</button>
+      <button type="button" data-tab="nudges">Nudges</button>
+      <button type="button" data-tab="notify">Notifications</button>
+      <button type="button" data-tab="people">People</button>
+      <button type="button" data-tab="devices">Devices</button>
+    </nav>
+
+    <section data-pane="coach" hidden>
+      <div id="persona-list" class="personas"></div>
+      <div class="set-row"><label><input type="checkbox" data-pref="coach.rotate"> 🔄 New companion every week</label>
+        <label><input type="checkbox" data-pref="coach.ai"> ✨ Let AI write some lines</label></div>
+      <h3>Focus sessions</h3>
+      <div class="set-row"><label>Length (min) <input type="number" min="5" max="180" data-pref="sessions.minutes"></label>
+        <label>Break (min) <input type="number" min="1" max="60" data-pref="sessions.break_minutes"></label>
+        <label>Check-ins <input type="number" min="0" max="6" data-pref="sessions.checkins"></label></div>
+      <div class="set-row"><label><input type="checkbox" data-pref="sessions.quiet"> 🎧 Quiet notifications during sessions</label>
+        <label>Sound <select data-pref="sessions.sound"><option value="off">off</option><option value="brown">brown noise</option><option value="rain">rain</option><option value="cafe">café</option><option value="hum">low hum</option></select></label></div>
+    </section>
+
+    <section data-pane="routines">
+      <div class="set-row"><label><input type="checkbox" data-pref="morning.enabled"> ☀️ Morning launch</label><input type="time" data-pref="morning.time"></div>
+      <div class="set-row"><label><input type="checkbox" data-pref="evening.enabled"> 🌙 Evening shutdown</label><input type="time" data-pref="evening.time"></div>
+      <div class="set-row"><label><input type="checkbox" data-pref="weekly.enabled"> 🧹 Weekly reset</label>
+        <select data-pref="weekly.day" data-num><option value="0">Mon</option><option value="1">Tue</option><option value="2">Wed</option><option value="3">Thu</option><option value="4">Fri</option><option value="5">Sat</option><option value="6">Sun</option></select>
+        <input type="time" data-pref="weekly.time"></div>
+      <p class="muted small">You get a nudge at these times, and the dashboard shows a button until you've done it.</p>
+    </section>
+
+    <section data-pane="nudges" hidden>
+      <p class="muted small">Meds and meals get through hyperfocus and repeat until you tap ✅. Times are comma-separated.</p>
+      <ul id="nudge-list" class="nudges"></ul>
+      <button type="button" id="nudge-add">＋ Add nudge</button>
+    </section>
+
+    <section data-pane="notify" hidden>
+      <h3>This device</h3>
+      <div class="set-row"><span id="push-status" class="muted small"></span><span class="spacer"></span>
+        <button type="button" id="push-enable">Enable notifications</button>
+        <button type="button" id="push-test" hidden>Send test</button></div>
+      <h3>Send to</h3>
+      <div class="set-row"><label><input type="checkbox" data-pref="channels.push"> Phone / browser</label>
+        <label><input type="checkbox" data-pref="channels.telegram"> Telegram</label></div>
+      <h3>Timed tasks</h3>
+      <div class="set-row"><label>Heads-up before (min) <input type="number" min="0" max="240" data-pref="reminders.lead_minutes"></label>
+        <label>Follow-ups <input type="number" min="0" max="10" data-pref="reminders.max_follow_ups"></label>
+        <label>every (min) <input type="number" min="5" max="240" data-pref="reminders.follow_up_minutes"></label></div>
+      <h3>Hyperfocus</h3>
+      <div class="set-row"><label>Default length (min) <input type="number" min="15" max="480" data-pref="hyperfocus_minutes"></label></div>
+    </section>
+
+    <section data-pane="people" hidden>
+      <div class="row"><label class="small muted" style="white-space:nowrap">Your name</label><input id="my-name" placeholder="What your people see"></div>
+      <ul id="people-manage" class="list"></ul>
+      <h3>Invite someone</h3>
+      <div class="row"><input id="invite-name" placeholder="Their name"><button type="button" id="invite-go">Create invite link</button></div>
+      <div id="invite-out" hidden><p class="small muted">Send them this link (valid 3 days, works once):</p><code id="invite-url"></code></div>
+      <h3>What they see</h3>
+      <div class="set-row"><label><input type="checkbox" data-pref="people.share_wins"> My wins</label>
+        <label><input type="checkbox" data-pref="people.share_titles"> …with task names</label></div>
+      <p class="muted small">Your open tasks stay private unless you mark them 🏠 shared (or write #home in a capture).</p>
+      <div class="set-row"><label><input type="checkbox" data-pref="people.share_home"> Share every "home" task automatically</label></div>
+      <h3>Evening digest</h3>
+      <div class="set-row"><label><input type="checkbox" data-pref="people.digest"> Tell me what they got done</label><input type="time" data-pref="people.digest_time"></div>
+      <h3>Telegram</h3>
+      <div class="set-row"><button type="button" id="tg-link">Link this account to Telegram</button><span id="tg-code" class="small"></span></div>
+    </section>
+
+    <section data-pane="devices" hidden>
+      <h3>Pair your watch</h3>
+      <div class="row"><input id="pair-code" inputmode="numeric" maxlength="7" placeholder="6-digit code from the watch"><button type="button" id="pair-go">Pair</button></div>
+      <h3>Device tokens</h3>
+      <p class="muted small">For the desk monitor and scripts.</p>
+      <ul id="token-list" class="list"></ul>
+      <div class="row">
+        <input id="token-name" placeholder="Device name, e.g. desk monitor">
+        <button type="button" id="token-create">Create token</button>
+      </div>
+      <div id="token-new" hidden>
+        <p class="small">Copy it now. It won't be shown again.</p>
+        <code id="token-value"></code>
+        <p class="small muted">Desk monitor URL:</p>
+        <code id="token-kiosk"></code>
+        <p class="small muted">Capture from anything that can send HTTP:</p>
+        <code id="token-curl"></code>
+      </div>
+      <p id="who" class="muted small"></p>
+    </section>
+
+    <div class="row"><a id="logout" href="/auth/logout" hidden>Log out</a><span class="spacer"></span><button class="primary">Close</button></div>
+  </form>
+</dialog>
+
+<!-- people: wins feed -->
+<dialog id="feed">
+  <form method="dialog">
+    <h2>💞 Wins</h2>
+    <p class="muted small">The last 7 days. Cheer each other on.</p>
+    <ul id="feed-list" class="list feed"></ul>
+    <div class="row"><span class="spacer"></span><button class="primary">Close</button></div>
+  </form>
+</dialog>
+
+<!-- game -->
+<dialog id="game">
+  <form method="dialog">
+    <div class="game-head"><div id="game-avatar"></div><div><h2 id="game-title">Collection</h2><div id="game-wallet" class="muted"></div></div></div>
+    <div id="game-event"></div>
+    <nav class="tabs">
+      <button type="button" data-gtab="challenges" class="on">🎖 Challenges</button>
+      <button type="button" data-gtab="shop">🛍 Shop</button>
+      <button type="button" data-gtab="wardrobe">👕 Wardrobe</button>
+      <button type="button" data-gtab="badges">🏅 Badges</button>
+    </nav>
+    <div id="game-body"></div>
+    <div class="row"><span class="spacer"></span><button class="primary">Close</button></div>
+  </form>
+</dialog>
+
+<!-- guided routines -->
+<dialog id="flow">
+  <div id="flow-body"></div>
+  <div class="row"><button type="button" id="flow-close" class="link">Not now</button><span class="spacer"></span>
+    <span id="flow-dots" class="muted small"></span>
+    <button type="button" id="flow-next" class="primary">Next</button></div>
+</dialog>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+services:
+  ticklight2:
+    build: .
+    image: ticklight2:latest
+    container_name: ticklight2
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ticklight2-data:/data
+
+volumes:
+  ticklight2-data:

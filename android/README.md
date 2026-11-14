@@ -17,6 +17,26 @@ and open it (allow installs from your browser when asked). Every push to `main` 
 
 Open the app, enter your server address, sign in.
 
+## Passkeys on the login page
+
+The app's WebView can use passkeys only for sites that list the app. Serve
+[`assetlinks.json`](assetlinks.json) at `https://<your Authentik host>/.well-known/assetlinks.json`
+(the host that shows the login page, not Ticklight's). For example, with nginx in front of Authentik:
+
+```nginx
+location = /.well-known/assetlinks.json {
+    default_type application/json;
+    alias /etc/nginx/ticklight-assetlinks.json;
+}
+```
+
+Traefik / Nginx Proxy Manager / Caddy: add the same static file route for that one path.
+Check it with `curl https://<your Authentik host>/.well-known/assetlinks.json`. Android caches the
+check; if login still fails right after, clear Google Play services' cache or wait a few hours.
+
+The fingerprint in the file belongs to the release key in the repo secrets. Without that file,
+"Error creating credential" shows up on passkey steps; log in with password (+ TOTP) instead.
+
 ## Notifications
 
 Android apps outside Google Play's Firebase need a push app to deliver messages. Ticklight uses

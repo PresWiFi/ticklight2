@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.ticklight.phone",
+      "sha256_cert_fingerprints": [
+        "FC:C2:4A:6F:78:9C:49:D1:09:97:D5:3F:E5:18:9A:C8:F5:7A:57:22:FF:3C:61:25:64:4C:EB:22:20:34:BF:A0"
+      ]
+    }
+  }
+]

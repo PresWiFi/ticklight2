@@ -25,6 +25,8 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
 import org.json.JSONObject
 import org.unifiedpush.android.connector.UnifiedPush
 import java.net.HttpURLConnection
@@ -141,6 +143,11 @@ class MainActivity : Activity() {
             domStorageEnabled = true
             mediaPlaybackRequiresUserGesture = false
             userAgentString = "$userAgentString TicklightAndroid/${BuildConfig.VERSION_NAME}"
+        }
+        // Passkeys (WebAuthn) for the login page. The site must list this app in
+        // /.well-known/assetlinks.json; see android/README.md.
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_AUTHENTICATION)) {
+            WebSettingsCompat.setWebAuthenticationSupport(w.settings, WebSettingsCompat.WEB_AUTHENTICATION_SUPPORT_FOR_APP)
         }
         CookieManager.getInstance().setAcceptCookie(true)
         w.addJavascriptInterface(Bridge(), "TicklightApp")

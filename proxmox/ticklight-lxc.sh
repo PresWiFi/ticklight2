@@ -9,6 +9,7 @@
 #   bash ticklight-lxc.sh --update 123
 #
 # Every setting can be preset through environment variables to skip the prompts, e.g.
+#   DEBIAN_VERSION=12 bash ticklight-lxc.sh   # pick the container OS version
 #   CTID=150 BRIDGE=vmbr1 IP=192.168.1.50/24 GW=192.168.1.1 TELEGRAM_BOT_TOKEN=... bash ticklight-lxc.sh
 set -euo pipefail
 
@@ -132,7 +133,8 @@ pct status "$CTID" &>/dev/null && die "CT $CTID already exists."
 info "Finding Debian template"
 pveam update >/dev/null || true
 TEMPLATE=""
-for ver in 13 12; do
+# DEBIAN_VERSION=12 forces a version (e.g. if Debian 13 containers won't start on your host)
+for ver in ${DEBIAN_VERSION:-13 12}; do
   TEMPLATE=$(pveam available --section system | awk -v v="debian-$ver-standard" '$2 ~ v {print $2}' | sort -V | tail -1)
   [[ -n "$TEMPLATE" ]] && break
 done
@@ -157,7 +159,15 @@ pct create "$CTID" "$TEMPLATE_STORAGE:vztmpl/$TEMPLATE" \
   --unprivileged 1 --features nesting=1 \
   --onboot 1 --tags ticklight \
   --description "Ticklight 2 – http://<ip>:8080" >/dev/null
-pct start "$CTID"
+if ! pct start "$CTID" 2>/dev/null; then
+  echo
+  printf '\e[1;31m✘ CT %s was created but would not start. Details:\e[0m\n' "$CTID"
+  pct start "$CTID" --debug 2>&1 | grep -iE "error|fail|denied|unsupported|not found" | tail -15
+  echo
+  echo "   Remove it with:  pct destroy $CTID"
+  echo "   Then try Debian 12:  DEBIAN_VERSION=12 bash ticklight-lxc.sh"
+  exit 1
+fi
 ok "CT $CTID started"
 
 info "Waiting for network"

@@ -8,6 +8,7 @@ if (params.get("token")) {
   history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : ""));
 }
 const token = localStorage.getItem("ticklight-token") || "";
+const NATIVE = window.TicklightApp || null;  // running inside the Android app
 // The service worker can't read localStorage; give it the token for notification buttons
 if ("caches" in window) caches.open("ticklight-auth").then((c) =>
   token ? c.put("/__token", new Response(token)) : c.delete("/__token"));
@@ -486,8 +487,22 @@ function b64ToBytes(s) {
   const raw = atob((s + "=".repeat((4 - (s.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
+const PUSH_TEXT = {
+  on: "On for this phone", off: "Off for this phone", pending: "Connecting…",
+  "no-distributor": "Needs a push app. Install ntfy (Play Store), open it once, then tap Enable.",
+  failed: "Didn't work",
+};
 async function updatePushStatus() {
   const st = $("#push-status");
+  if (NATIVE) {
+    const i = JSON.parse(NATIVE.info());
+    st.textContent = (PUSH_TEXT[i.push] || i.push) + (i.push === "failed" && i.pushError ? `: ${i.pushError}` : "")
+      + (i.push === "on" && i.distributor ? ` (via ${i.distributor.split(".").pop()})` : "");
+    $("#push-enable").hidden = false;
+    $("#push-enable").textContent = i.push === "on" ? "Turn off" : "Enable notifications";
+    $("#push-test").hidden = i.push !== "on";
+    return;
+  }
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
     st.textContent = location.protocol === "https:" ? "This browser doesn't support push." : "Push needs HTTPS.";
     $("#push-enable").hidden = true;
@@ -500,6 +515,11 @@ async function updatePushStatus() {
   $("#push-test").hidden = !sub;
 }
 $("#push-enable").addEventListener("click", async () => {
+  if (NATIVE) {
+    me = me || await api("/api/me");
+    JSON.parse(NATIVE.info()).push === "on" ? NATIVE.disablePush() : NATIVE.enablePush(me.push_key);
+    return updatePushStatus();
+  }
   const reg = await navigator.serviceWorker.ready;
   const sub = await reg.pushManager.getSubscription();
   if (sub) {
@@ -1221,6 +1241,33 @@ function drawGame() {
         h("div", { class: "item-emoji" }, b.at ? b.emoji : "🔒"), h("b", {}, b.name), h("div", { class: "muted small" }, b.desc))))];
   }
   $("#game-body").replaceChildren(...body.filter(Boolean));
+}
+
+// ---------- Android app (window.TicklightApp) ----------
+// The app keeps its own device token so notification buttons, the widget and quick add work
+// without the page. Make one for whoever is signed in here.
+async function nativeSetup() {
+  document.body.classList.add("native");
+  const info = JSON.parse(NATIVE.info());
+  const m = await api("/api/me");
+  if (!info.token || info.uid !== m.user.id) {
+    const t = await post("/api/tokens", { name: "Android app" });
+    NATIVE.setToken(t.token, m.user.id);
+  }
+}
+if (NATIVE) {
+  nativeSetup().catch((e) => console.warn("app setup failed", e));
+  window.ticklightResume = () => load();
+  window.ticklightPush = () => $("#settings").open && updatePushStatus();
+  // Back button: close the top dialog first
+  window.ticklightBack = () => {
+    const open = [...document.querySelectorAll("dialog[open]")];
+    if (!open.length) return false;
+    open[open.length - 1].close();
+    return true;
+  };
+  $("#logout").addEventListener("click", () => NATIVE.clearToken());
+  $("#push-test").after(h("button", { type: "button", onclick: () => confirm("Disconnect this phone and pick a different server?") && NATIVE.resetServer() }, "Change server"));
 }
 
 // ---------- installable app ----------

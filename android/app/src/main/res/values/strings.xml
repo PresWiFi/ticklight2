@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Ticklight</string>
+    <string name="quick_add">Quick add</string>
+    <string name="voice_add">Voice add</string>
+    <string name="start_session">Focus session</string>
+    <string name="share_label">Add to Ticklight</string>
+    <string name="widget_label">Ticklight: next up</string>
+</resources>

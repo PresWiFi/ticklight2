@@ -42,8 +42,9 @@ A self-hosted ADHD task system for an always-on desk monitor, your phone, your w
   Mark a task 🏠 shared (or put `#home` / `#shared` on a line when capturing) and it shows up for both;
   whoever ticks it gets the XP. Send each other tasks from the 💞 card (AI-sorted like any capture).
   Optional evening digest: "Sam finished 5 things today". Open tasks stay private unless shared.
-- **Phone app.** Install from Chrome (⋮ → Add to home screen). Push notifications with Done / Not now
-  buttons that work without opening the app. Long-press the icon for Capture, Voice note, Morning launch.
+- **Android app.** The whole app outside Chrome (so Chrome screen time limits don't apply), with
+  notifications, a Focus widget, a share target and a quick settings tile. See [android/README.md](android/README.md).
+  Or install the web app from Chrome (⋮ → Add to home screen) for Web Push notifications.
 - **Telegram.** Send text or a voice note to capture it. `/focus`, `/energy`, `/today`, `/someday`,
   `/session`, `/hyperfocus`. Gets the same notifications as the phone (toggle per channel in ⚙ → Notifications).
 - **Alexa.** "Alexa, tell Tick Light to add buy milk tomorrow" · "…ask Tick Light what's next" ·

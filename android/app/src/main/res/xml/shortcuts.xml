@@ -1,0 +1,17 @@
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="voice" android:enabled="true"
+        android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/voice_add">
+        <intent android:action="app.ticklight.phone.VOICE_ADD"
+            android:targetPackage="app.ticklight.phone" android:targetClass="app.ticklight.phone.QuickAddActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="add" android:enabled="true"
+        android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/quick_add">
+        <intent android:action="app.ticklight.phone.QUICK_ADD"
+            android:targetPackage="app.ticklight.phone" android:targetClass="app.ticklight.phone.QuickAddActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="session" android:enabled="true"
+        android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/start_session">
+        <intent android:action="app.ticklight.phone.SESSION"
+            android:targetPackage="app.ticklight.phone" android:targetClass="app.ticklight.phone.MainActivity" />
+    </shortcut>
+</shortcuts>

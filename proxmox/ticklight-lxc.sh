@@ -133,12 +133,15 @@ pct status "$CTID" &>/dev/null && die "CT $CTID already exists."
 info "Finding Debian template"
 pveam update >/dev/null || true
 TEMPLATE=""
+ARCH=$(dpkg --print-architecture 2>/dev/null || echo amd64)
 # DEBIAN_VERSION=12 forces a version (e.g. if Debian 13 containers won't start on your host)
 for ver in ${DEBIAN_VERSION:-13 12}; do
-  TEMPLATE=$(pveam available --section system | awk -v v="debian-$ver-standard" '$2 ~ v {print $2}' | sort -V | tail -1)
+  # The list has every architecture; pick the one matching this host (amd64, arm64, …)
+  TEMPLATE=$(pveam available --section system \
+    | awk -v v="debian-$ver-standard" -v a="_${ARCH}.tar" '$2 ~ v && index($2, a) {print $2}' | sort -V | tail -1)
   [[ -n "$TEMPLATE" ]] && break
 done
-[[ -n "$TEMPLATE" ]] || die "No Debian template available from pveam."
+[[ -n "$TEMPLATE" ]] || die "No Debian template for $ARCH available from pveam."
 if ! pveam list "$TEMPLATE_STORAGE" | grep -q "$TEMPLATE"; then
   info "Downloading $TEMPLATE"
   pveam download "$TEMPLATE_STORAGE" "$TEMPLATE" >/dev/null

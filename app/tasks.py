@@ -612,6 +612,12 @@ class Tasks:
                if not t["due_date"] and not (t["not_now_until"] and t["not_now_until"] > now)]
         return sorted(out, key=lambda t: (-t["priority"], t["id"]))
 
+    def snoozed(self, uid: int) -> list[dict]:
+        """Open tasks hidden with "Not now" that haven't come back yet."""
+        now = self.now().isoformat(timespec="seconds")
+        return sorted((t for t in self.open_tasks(uid) if t["not_now_until"] and t["not_now_until"] > now),
+                      key=lambda t: (-t["priority"], t["id"]))
+
     def board(self, uid: int, upcoming_days: int = 7) -> dict:
         self.tidy(uid)
         today = self.today()
@@ -700,7 +706,8 @@ class Tasks:
                 " ORDER BY updated_at", (uid, day, task_id))]
             for old in picks[:max(0, len(picks) - 2)]:
                 c.execute("UPDATE tasks SET pinned_on=NULL WHERE id=?", (old,))
-            c.execute("UPDATE tasks SET pinned_on=?, updated_at=?, touched_at=? WHERE id=?",
+            # Picking a task overrides an earlier "Not now", so it shows up in Focus.
+            c.execute("UPDATE tasks SET pinned_on=?, not_now_until=NULL, updated_at=?, touched_at=? WHERE id=?",
                       (day, self._stamp(), self._stamp(), task_id))
         self._changed()
         return self.get(uid, task_id)
@@ -770,7 +777,8 @@ class Tasks:
                      if t["due_date"] and _d(t["due_date"]) <= today or t["pinned"]]
         return {"done": [t for t in self.done_on(uid, today) if not t["skipped"]],
                 "leftovers": leftovers, "stats": self.stats(uid),
-                "candidates": self.focus(uid, 8), "anytime": self.anytime(uid)}
+                "candidates": self.focus(uid, 8), "anytime": self.anytime(uid),
+                "snoozed": self.snoozed(uid)}
 
     def weekly(self, uid: int) -> dict:
         """Things that need a decision, oldest first, plus how the week went."""

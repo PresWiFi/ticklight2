@@ -201,6 +201,11 @@ def test_routine_endpoints_and_prefs(tmp_path, monkeypatch):
         assert [x["title"] for x in m["pinned"]] == ["taxes"]
         assert "taxes" in [x["title"] for x in m["anytime"]]
         assert "anytime" in c.get("/api/routine/evening").json()
+        n = c.post("/api/quick", json={"text": "snoozed thing"}).json()
+        c.post(f"/api/tasks/{n['id']}/not-now")
+        m = c.get("/api/routine/morning").json()
+        assert n["id"] in [x["id"] for x in m["snoozed"]] and n["id"] not in [x["id"] for x in m["anytime"]]
+        assert c.post(f"/api/tasks/{n['id']}/pin").json()["not_now_until"] is None
         assert c.post(f"/api/tasks/{t['id']}/move", json={"when": "tomorrow"}).json()["due_date"]
         assert "leftovers" in c.get("/api/routine/evening").json()
         assert "items" in c.get("/api/routine/weekly").json()

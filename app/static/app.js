@@ -658,8 +658,9 @@ function pickList(groups, { max = 3, day = null, pickedIds = [] } = {}) {
     } },
     h("span", { class: "pin" }, picked.has(t.id) ? "📌" : "○"),
     h("div", { class: "t" }, t.title, h("div", { class: "sub" }, [t.area, t.minutes && `~${t.minutes} min`, ...(t.focus_why || [])].filter(Boolean).join(" · "))));
-  const draw = () => box.replaceChildren(...groups.flatMap(([label, tasks]) =>
-    [label && h("h3", {}, label), h("ul", { class: "list pick" }, tasks.map(item))]));
+  const draw = () => box.replaceChildren(...(groups.length ? groups.flatMap(([label, tasks]) =>
+    [label && h("h3", {}, label), h("ul", { class: "list pick" }, tasks.map(item))])
+    : [h("p", { class: "muted" }, "No open tasks to pick from. Add some in the next step.")]));
   draw();
   return box;
 }
@@ -694,7 +695,7 @@ async function openFlow(name) {
             onclick: async (e) => { await post("/api/energy", { level: lv }); e.target.parentNode.querySelectorAll("button").forEach((b) => b.classList.remove("on")); e.target.classList.add("on"); } },
             ENERGY[lv])))] },
       { render: () => [h("h2", {}, "Pick today's three"), h("p", { class: "muted" }, "Only three. Everything else can wait. Tap to pick."),
-          pickList([[null, [...d.pinned, ...d.candidates]], ["Anytime", d.anytime]], { pickedIds: d.pinned.map((t) => t.id) })] },
+          pickList([[null, [...d.pinned, ...d.candidates]], ["Anytime", d.anytime], ["Snoozed with Not now", d.snoozed]], { pickedIds: d.pinned.map((t) => t.id) })] },
       { render: () => [h("h2", {}, "Brain dump"), dump.el], leave: () => dump.save(), finish: "Let's go" },
     ];
   } else if (name === "evening") {
@@ -711,7 +712,7 @@ async function openFlow(name) {
             h("button", { onclick: (e) => e.target.closest("li").replaceChildren(h("span", { class: "muted" }, `👍 ${t.title}: stays`)) }, "Keep")))) ] }] : []),
       { render: () => [h("h2", {}, "Brain dump"), dump.el], leave: () => dump.save() },
       { render: () => [h("h2", {}, "Tomorrow's first thing"), h("p", { class: "muted" }, "Pick one. Future you will know exactly where to start."),
-          pickList([[null, d.candidates], ["Anytime", d.anytime]], { max: 1, day: addDays(board.today_date, 1) })], finish: "Good night" },
+          pickList([[null, d.candidates], ["Anytime", d.anytime], ["Snoozed with Not now", d.snoozed]], { max: 1, day: addDays(board.today_date, 1) })], finish: "Good night" },
     ];
   } else if (name === "weekly") {
     const d = await api("/api/routine/weekly");

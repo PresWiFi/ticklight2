@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -804,10 +805,23 @@ def delete_token(token_id: int, uid: int = User):
     return {"ok": True}
 
 
+def _versioned_index() -> str:
+    """index.html with ?v=<content hash> on app.js/style.css, so CDN and browser caches
+    pick up a new release immediately."""
+    html = open(os.path.join(STATIC, "index.html"), encoding="utf-8").read()
+    for name in ("app.js", "style.css"):
+        with open(os.path.join(STATIC, name), "rb") as f:
+            v = hashlib.sha256(f.read()).hexdigest()[:10]
+        html = html.replace(f'"/static/{name}"', f'"/static/{name}?v={v}"')
+    return html
+
+
+INDEX_HTML = _versioned_index()
+
+
 @app.get("/")
 def index():
-    return FileResponse(os.path.join(STATIC, "index.html"),
-                        headers={"Cache-Control": "no-cache"})
+    return HTMLResponse(INDEX_HTML, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/sw.js")

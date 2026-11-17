@@ -605,6 +605,13 @@ class Tasks:
         scored.sort(key=lambda t: (-t["focus_score"], t["created_at"]))
         return scored[:n]
 
+    def anytime(self, uid: int) -> list[dict]:
+        """Undated open tasks that aren't snoozed, most important first."""
+        now = self.now().isoformat(timespec="seconds")
+        out = [t for t in self.open_tasks(uid)
+               if not t["due_date"] and not (t["not_now_until"] and t["not_now_until"] > now)]
+        return sorted(out, key=lambda t: (-t["priority"], t["id"]))
+
     def board(self, uid: int, upcoming_days: int = 7) -> dict:
         self.tidy(uid)
         today = self.today()
@@ -763,7 +770,7 @@ class Tasks:
                      if t["due_date"] and _d(t["due_date"]) <= today or t["pinned"]]
         return {"done": [t for t in self.done_on(uid, today) if not t["skipped"]],
                 "leftovers": leftovers, "stats": self.stats(uid),
-                "candidates": self.focus(uid, 8)}
+                "candidates": self.focus(uid, 8), "anytime": self.anytime(uid)}
 
     def weekly(self, uid: int) -> dict:
         """Things that need a decision, oldest first, plus how the week went."""

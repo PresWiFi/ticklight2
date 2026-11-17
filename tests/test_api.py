@@ -199,6 +199,8 @@ def test_routine_endpoints_and_prefs(tmp_path, monkeypatch):
         assert c.post(f"/api/tasks/{t['id']}/pin").json()["pinned"]
         m = c.get("/api/routine/morning").json()
         assert [x["title"] for x in m["pinned"]] == ["taxes"]
+        assert "taxes" in [x["title"] for x in m["anytime"]]
+        assert "anytime" in c.get("/api/routine/evening").json()
         assert c.post(f"/api/tasks/{t['id']}/move", json={"when": "tomorrow"}).json()["due_date"]
         assert "leftovers" in c.get("/api/routine/evening").json()
         assert "items" in c.get("/api/routine/weekly").json()

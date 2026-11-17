@@ -471,7 +471,8 @@ def today_checkins(uid: int = User):
 @app.get("/api/routine/{name}")
 def routine(name: str, uid: int = User):
     if name == "morning":
-        return {"candidates": tasks.focus(uid, 8), "pinned": tasks.board(uid)["pinned"],
+        return {"candidates": tasks.focus(uid, 8), "anytime": tasks.anytime(uid),
+                "pinned": tasks.board(uid)["pinned"],
                 "energy": tasks.energy(uid), "prefs": prefs.get(uid),
                 "checkins": tasks.checkins_on(uid, tasks.today())}
     if name == "evening":

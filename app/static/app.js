@@ -640,10 +640,14 @@ $("#flow-next").addEventListener("click", async () => {
 });
 $("#flow-close").addEventListener("click", () => { flow.close(); load(); });
 
-function pickList(tasks, { max = 3, day = null, pickedIds = [] } = {}) {
+// groups: [[heading or null, tasks], ...]. A task appears once, in the first group that has it.
+function pickList(groups, { max = 3, day = null, pickedIds = [] } = {}) {
   const picked = new Set(pickedIds);
-  const ul = h("ul", { class: "list pick" });
-  const draw = () => ul.replaceChildren(...tasks.map((t) => h("li", { class: picked.has(t.id) ? "picked" : "",
+  const seen = new Set();
+  groups = groups.map(([label, tasks]) => [label, tasks.filter((t) => !seen.has(t.id) && seen.add(t.id))])
+    .filter(([, tasks]) => tasks.length);
+  const box = h("div");
+  const item = (t) => h("li", { class: picked.has(t.id) ? "picked" : "",
     onclick: async () => {
       if (picked.has(t.id)) { picked.delete(t.id); await post(`/api/tasks/${t.id}/unpin`); }
       else {
@@ -653,9 +657,11 @@ function pickList(tasks, { max = 3, day = null, pickedIds = [] } = {}) {
       draw();
     } },
     h("span", { class: "pin" }, picked.has(t.id) ? "📌" : "○"),
-    h("div", { class: "t" }, t.title, h("div", { class: "sub" }, [t.area, t.minutes && `~${t.minutes} min`, ...(t.focus_why || [])].filter(Boolean).join(" · "))))));
+    h("div", { class: "t" }, t.title, h("div", { class: "sub" }, [t.area, t.minutes && `~${t.minutes} min`, ...(t.focus_why || [])].filter(Boolean).join(" · "))));
+  const draw = () => box.replaceChildren(...groups.flatMap(([label, tasks]) =>
+    [label && h("h3", {}, label), h("ul", { class: "list pick" }, tasks.map(item))]));
   draw();
-  return ul;
+  return box;
 }
 
 function dumpBox(placeholder) {
@@ -688,7 +694,7 @@ async function openFlow(name) {
             onclick: async (e) => { await post("/api/energy", { level: lv }); e.target.parentNode.querySelectorAll("button").forEach((b) => b.classList.remove("on")); e.target.classList.add("on"); } },
             ENERGY[lv])))] },
       { render: () => [h("h2", {}, "Pick today's three"), h("p", { class: "muted" }, "Only three. Everything else can wait. Tap to pick."),
-          pickList([...d.pinned, ...d.candidates.filter((c) => !d.pinned.some((p) => p.id === c.id))], { pickedIds: d.pinned.map((t) => t.id) })] },
+          pickList([[null, [...d.pinned, ...d.candidates]], ["Anytime", d.anytime]], { pickedIds: d.pinned.map((t) => t.id) })] },
       { render: () => [h("h2", {}, "Brain dump"), dump.el], leave: () => dump.save(), finish: "Let's go" },
     ];
   } else if (name === "evening") {
@@ -705,7 +711,7 @@ async function openFlow(name) {
             h("button", { onclick: (e) => e.target.closest("li").replaceChildren(h("span", { class: "muted" }, `👍 ${t.title}: stays`)) }, "Keep")))) ] }] : []),
       { render: () => [h("h2", {}, "Brain dump"), dump.el], leave: () => dump.save() },
       { render: () => [h("h2", {}, "Tomorrow's first thing"), h("p", { class: "muted" }, "Pick one. Future you will know exactly where to start."),
-          pickList(d.candidates, { max: 1, day: addDays(board.today_date, 1) })], finish: "Good night" },
+          pickList([[null, d.candidates], ["Anytime", d.anytime]], { max: 1, day: addDays(board.today_date, 1) })], finish: "Good night" },
     ];
   } else if (name === "weekly") {
     const d = await api("/api/routine/weekly");

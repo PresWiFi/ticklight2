@@ -1306,6 +1306,16 @@ $("#anytime-toggle").addEventListener("click", (e) => {
   e.currentTarget.classList.toggle("open", open);
 });
 
+// Enter in a dialog's text field presses its primary button. Without this the browser uses the
+// first submit button in the form, which is Cancel.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || e.defaultPrevented || e.isComposing || e.target.tagName !== "INPUT") return;
+  const form = e.target.form, primary = form?.querySelector("button.primary:not([hidden])");
+  if (!form || form.method !== "dialog" || !primary) return;
+  e.preventDefault();
+  form.requestSubmit(primary);
+});
+
 document.addEventListener("keydown", (e) => {
   if (e.target.closest("input, textarea, select, dialog")) return;
   if (e.key === "/") { e.preventDefault(); input.focus(); }

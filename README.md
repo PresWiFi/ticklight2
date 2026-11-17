@@ -65,6 +65,9 @@ bash proxmox/ticklight-lxc.sh --update 123
 
 Docker: `cp .env.example .env && docker compose up -d`
 
+Setting it up for someone else: [docs/NEW_USER_PROMPT.md](docs/NEW_USER_PROMPT.md) is a prompt for a
+coding agent that interviews them, picks their settings, and deploys it.
+
 Local: `uv venv && uv pip install -r requirements-dev.txt && python -m app.main`
 
 Config is in `.env` (`/etc/ticklight/ticklight.env` in the LXC). See `.env.example`.

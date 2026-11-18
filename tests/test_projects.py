@@ -89,3 +89,14 @@ def test_edit_finish_reopen_delete(tmp_path, monkeypatch):
         c.delete(f"/api/projects/{p['id']}")
         assert c.get(f"/api/tasks/{b['id']}").json()["project"] is None
         assert c.patch(f"/api/tasks/{b['id']}", json={"project_id": p["id"]}).status_code == 404
+
+
+def test_done_by_day(tmp_path, monkeypatch):
+    c, _ = make_client(tmp_path, monkeypatch)
+    with c:
+        t = c.post("/api/tasks", json={"title": "water plants"}).json()
+        c.post(f"/api/tasks/{t['id']}/complete")
+        d = c.get("/api/done").json()
+        assert d["day"] == d["today"] and [x["title"] for x in d["tasks"]] == ["water plants"]
+        assert c.get("/api/done?day=2020-01-01").json()["tasks"] == []
+        assert c.get("/api/done?day=nope").status_code == 422

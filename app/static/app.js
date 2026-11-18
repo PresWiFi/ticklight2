@@ -151,12 +151,13 @@ function render() {
   $("#xp-bar").style.width = Math.round((100 * s.into) / s.needed) + "%";
   $("#level").title = `${s.xp} XP total · ${s.needed - s.into} to level ${s.level + 1}`;
   $("#xp-today").textContent = s.xp_today ? `+${s.xp_today} XP today` : "";
-  // done strip
+  // done today: one card; the full list opens in a dialog
   const done = b.done_today.filter((t) => !t.skipped);
-  $("#done-strip").replaceChildren(...(done.length
-    ? [h("span", {}, `✅ ${done.length} done today`),
-       ...done.slice(0, 12).map((t) => h("span", { class: "d", title: "Undo", onclick: () => undo(t.id) }, t.title))]
-    : []));
+  $("#done-card").replaceChildren(
+    h("div", { class: "pname" }, done.length ? `✅ ${done.length} done today` : "✅ Done today"),
+    h("div", { class: "psub" }, done.length ? done.slice(0, 3).map((t) => t.title).join(" · ") + (done.length > 3 ? " …" : "") : ""),
+    ...(done.length ? [] : [h("div", { class: "muted small" }, "Nothing ticked yet. Earlier days are in here too.")]));
+  if ($("#done-dlg").open) renderDone();
   renderBanners();
   renderPeople();
   renderGame();
@@ -479,6 +480,36 @@ $("#pj-delete").addEventListener("click", async () => {
   $("#project").close();
   load();
 });
+
+// ---------- done ----------
+let doneDay = null;
+async function renderDone() {
+  const d = await api(`/api/done?day=${doneDay}`);
+  const isToday = d.day === d.today;
+  const shown = d.tasks.filter((t) => !t.skipped).length;
+  $("#done-title").textContent = (isToday ? "Today" : new Date(d.day + "T00:00").toLocaleDateString([], { weekday: "long", day: "numeric", month: "short" }))
+    + (shown ? ` · ${shown} done` : "");
+  $("#done-next").disabled = isToday;
+  const time = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  $("#done-list").replaceChildren(...(d.tasks.length ? d.tasks.map((t) => h("li", { class: t.skipped ? "skipped" : "" },
+    h("span", { class: "when" }, time(t.done_at)),
+    h("div", { class: "t", onclick: () => openEdit(t.id) }, t.skipped ? "⏭ " : "✓ ", t.title,
+      t.project ? h("div", { class: "sub" }, `📁 ${t.project.name}`) : null),
+    isToday && t.status !== "deleted" ? h("button", { type: "button", title: "Not done after all", onclick: () => undo(t.id) }, "↩️") : null))
+    : [h("li", { class: "muted" }, isToday ? "Nothing yet. The first one's the hardest." : "Nothing ticked that day. Rest counts too.")]));
+}
+function shiftDoneDay(n) {
+  const [y, m, d] = doneDay.split("-").map(Number);
+  doneDay = new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+  renderDone();
+}
+$("#done-card").addEventListener("click", async () => {
+  doneDay = board.today_date;
+  await renderDone();
+  $("#done-dlg").showModal();
+});
+$("#done-prev").addEventListener("click", () => shiftDoneDay(-1));
+$("#done-next").addEventListener("click", () => shiftDoneDay(1));
 
 async function openSomeday() {
   const items = await api("/api/tasks?status=someday");

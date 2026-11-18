@@ -276,6 +276,13 @@ def board(uid: int = User):
     return b
 
 
+@app.get("/api/done")
+def done_list(day: date | None = None, uid: int = User):
+    """What you ticked off on a day (default today), newest first."""
+    day = day or tasks.today()
+    return {"day": day.isoformat(), "today": tasks.today().isoformat(), "tasks": tasks.done_on(uid, day)}
+
+
 @app.get("/api/focus")
 def focus(n: int = 3, uid: int = User):
     return {"energy": tasks.energy(uid), "tasks": tasks.focus(uid, max(1, min(10, n)))}

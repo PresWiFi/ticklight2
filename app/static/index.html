@@ -65,6 +65,7 @@
     <div id="focus"></div>
     <h2 class="projects-h">Projects</h2>
     <div id="projects" class="projects"></div>
+    <button type="button" id="done-card" class="pcard done-card" title="See everything you finished"></button>
   </section>
 
   <section id="list-col">
@@ -88,9 +89,6 @@
   </section>
 </main>
 
-<footer>
-  <div id="done-strip"></div>
-</footer>
 
 <div id="toasts"></div>
 
@@ -205,6 +203,18 @@
       <span class="spacer"></span>
       <button class="primary">Close</button>
     </div>
+  </form>
+</dialog>
+
+<dialog id="done-dlg">
+  <form method="dialog">
+    <div class="row day-nav">
+      <button type="button" id="done-prev" title="Day before">‹</button>
+      <h2 id="done-title"></h2>
+      <button type="button" id="done-next" title="Day after">›</button>
+    </div>
+    <ul id="done-list" class="list"></ul>
+    <div class="row"><span class="spacer"></span><button class="primary">Close</button></div>
   </form>
 </dialog>
 

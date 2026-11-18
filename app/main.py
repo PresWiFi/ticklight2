@@ -217,6 +217,7 @@ class TaskIn(BaseModel):
     minutes: int | None = None
     steps: list[str] | None = None
     shared: bool | None = None
+    project_id: int | None = None
 
 
 class TextIn(BaseModel):
@@ -298,7 +299,8 @@ async def capture_text(request: Request, wait: bool = False, uid: int = User):
     else:
         text = (await request.body()).decode("utf-8", "replace")
     source = request.query_params.get("source", "web")[:20]
-    cid = capture.record(uid, text, source)
+    project = request.query_params.get("project_id")
+    cid = capture.record(uid, text, source, int(project) if project and project.isdigit() else None)
     if wait:
         return await capture.process(uid, cid)
     spawn(process_capture(uid, cid))
@@ -355,7 +357,40 @@ def create_task(body: TaskIn, uid: int = User):
     return tasks.create(uid, body.title or "", body.notes or "",
                         1 if body.priority is None else body.priority,
                         body.due_date, body.due_time, body.recurrence,
-                        body.area, body.energy, body.minutes, body.steps, shared=bool(body.shared))
+                        body.area, body.energy, body.minutes, body.steps, shared=bool(body.shared),
+                        project_id=body.project_id)
+
+
+class ProjectIn(BaseModel):
+    name: str | None = None
+    status: str | None = None
+
+
+@app.get("/api/projects")
+def list_projects(status: str = "open", uid: int = User):
+    if status not in ("open", "done"):
+        raise ValueError("status must be open or done")
+    return tasks.projects(uid, status)
+
+
+@app.post("/api/projects", status_code=201)
+def create_project(body: ProjectIn, uid: int = User):
+    return tasks.create_project(uid, body.name or "")
+
+
+@app.get("/api/projects/{project_id}")
+def get_project(project_id: int, uid: int = User):
+    return tasks.project(uid, project_id)
+
+
+@app.patch("/api/projects/{project_id}")
+def update_project(project_id: int, body: ProjectIn, uid: int = User):
+    return tasks.update_project(uid, project_id, body.name, body.status)
+
+
+@app.delete("/api/projects/{project_id}")
+def delete_project(project_id: int, uid: int = User):
+    return tasks.delete_project(uid, project_id)
 
 
 @app.get("/api/tasks/{task_id}")

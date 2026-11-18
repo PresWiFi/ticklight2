@@ -368,3 +368,14 @@ body.display #session .s-controls, body.display #s-min { display: none; }
 .reacts { display: flex; gap: 2px; }
 .reacts button { padding: 2px 6px; background: none; border-color: transparent; font-size: 1.1em; }
 .reacts button.on { border-color: var(--accent); }
+
+/* projects */
+.projects .pcount { font-size: .8em; color: var(--muted); white-space: nowrap; }
+.projects .pbar { width: 54px; height: 5px; margin: 0; flex: none; }
+.projects .pbar div, #pj-bar { height: 100%; background: var(--ok); }
+.projects .pnew { width: 100%; padding: 6px 8px; border-radius: 8px; border: 1px dashed var(--line); background: none; color: var(--text); }
+.chip.project { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+#pj-name { border: none; background: none; padding: 2px 0; }
+#pj-name:focus { background: var(--panel-2); padding: 2px 6px; }
+#pj-add { flex: 1; resize: vertical; }
+#pj-tasks { margin-top: 10px; }

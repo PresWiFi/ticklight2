@@ -11,6 +11,12 @@ A self-hosted ADHD task system for an always-on desk monitor, your phone, your w
 - **Energy.** 🪫 🔋 ⚡ in the header. Untouched, it follows `ENERGY_SCHEDULE`; a tap overrides it for 4 hours.
 - **No guilt pile.** Nothing is labelled overdue. Missed one-off tasks sit at the bottom of Today, then
   move to 📦 Someday after 7 days (undated ones after 21 days untouched). Bring them back any time.
+- **Projects.** Brain dumps sort into your projects: the AI files tasks under a project you already
+  have, and starts a new one when you name it or several things in one dump work toward one goal.
+  Without AI, a line like `Garage:` files the lines under it (until a blank line). Tasks stay in
+  Today / Coming up / Anytime with a 📁 label; the Projects list shows progress and the next task.
+  Open a project to add to it (a list or brain dump works), rename it, or 🏁 finish it (what's
+  left moves to Someday).
 - **Today's three.** 📌 up to three picks a day; they lead Focus.
 - **Routines.** ☀️ Morning launch (meds, energy, pick today's three, brain dump), 🌙 evening shutdown
   (what you did, park leftovers, brain dump, tomorrow's first thing), 🧹 weekly reset (one decision

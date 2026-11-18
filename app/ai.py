@@ -60,9 +60,15 @@ Rules:
 - "someday": true for vague wishes and ideas ("learn piano one day"), else false.
 - "shared": true only if that item was tagged #home, #shared or #household; else false.
   Never put the tag in the title.
+- "project": the project the task belongs to, or "".
+  Their open projects: {projects}.
+  Use one of those names exactly when the task clearly belongs to it.
+  Start a new project (1-3 words, Title Case) only if the person names one ("for the garage",
+  a "Garage:" heading) or 2+ tasks in this dump are steps toward one bigger goal (a trip, a move,
+  a party). Everyday one-off chores get "".
 
 Reply with JSON only, no prose:
-{{"tasks": [{{"title": "", "when": "", "priority": "normal", "area": "home", "energy": "low", "minutes": 10, "steps": [], "someday": false, "shared": false}}]}}"""
+{{"tasks": [{{"title": "", "when": "", "priority": "normal", "area": "home", "energy": "low", "minutes": 10, "steps": [], "someday": false, "shared": false, "project": ""}}]}}"""
 
 BREAKDOWN_PROMPT = """Break a task into tiny steps for someone with ADHD who is stuck.
 
@@ -111,6 +117,7 @@ def clean_triage(data: dict) -> list[dict]:
             "steps": [_str(s, 100) for s in (t.get("steps") or [])[:6] if _str(s, 100)],
             "someday": bool(t.get("someday")),
             "shared": t.get("shared") is True,
+            "project": _str(t.get("project"), 40).strip(" :#"),
         })
     return out
 
@@ -183,9 +190,10 @@ class AI:
                     self._cooldown[t.label] = time.time() + COOLDOWN
         raise AIUnavailable("all AI providers failed")
 
-    async def triage(self, text: str, now: datetime) -> tuple[list[dict], str]:
+    async def triage(self, text: str, now: datetime, projects: list[str] | None = None) -> tuple[list[dict], str]:
+        names = ", ".join(json.dumps(p) for p in (projects or [])[:40]) or "none yet"
         system = TRIAGE_PROMPT.format(today=now.date().isoformat(), weekday=now.strftime("%A"),
-                                      time=now.strftime("%H:%M"), areas=", ".join(AREAS))
+                                      time=now.strftime("%H:%M"), areas=", ".join(AREAS), projects=names)
         data, label = await self.chat_json(system, text[:6000])
         tasks = clean_triage(data)
         if not tasks:

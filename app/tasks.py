@@ -19,7 +19,8 @@ class NotFound(Exception):
 
 AREAS = ("work", "home", "money", "health", "people", "fun")
 FIELDS = ("title", "notes", "priority", "due_date", "due_time", "recurrence",
-          "area", "energy", "minutes", "shared")
+          "area", "energy", "minutes", "shared", "project_id")
+PROJECT_NAME_MAX = 40
 # A user sees their own tasks plus tasks their linked people shared
 VISIBLE = ("(user_id=? OR (shared=1 AND user_id IN (SELECT other_id FROM links WHERE user_id=?)))")
 ENERGY_NAMES = {1: "low", 2: "medium", 3: "high"}
@@ -144,6 +145,9 @@ class Tasks:
         t["carried_over"] = bool(due and due < self.today() and t["status"] == "open")
         t["pinned"] = t.get("pinned_on") == self.today().isoformat()
         t["shared"] = bool(t.get("shared"))
+        pid = t.get("project_id")
+        row = self.db.one("SELECT name, status FROM projects WHERE id=?", (pid,)) if pid else None
+        t["project"] = {"id": pid, "name": row["name"]} if row and row["status"] == "open" else None
         return t
 
     def _first_due(self, rule: dict | None, due: date | None,
@@ -196,7 +200,7 @@ class Tasks:
                recurrence_rule: dict | None = None, area: str | None = None,
                energy=None, minutes=None, steps: list[str] | None = None,
                capture_id: int | None = None, status: str = "open", shared: bool = False,
-               from_user: int | None = None) -> dict:
+               from_user: int | None = None, project_id: int | None = None) -> dict:
         title = (title or "").strip()
         if not title:
             raise ValueError("title is required")
@@ -204,19 +208,21 @@ class Tasks:
         due = _d(due_date) if isinstance(due_date, str) else due_date
         due_time = _valid_time(due_time)
         due, anchor = self._first_due(rule, due, due_time)
+        project_id = self._own_project(uid, project_id)
         stamp = self._stamp()
         with self.db.tx() as c:
             cur = c.execute(
                 "INSERT INTO tasks(user_id, title, notes, priority, area, energy, minutes,"
                 " due_date, due_time, recurrence, anchor, status, capture_id, shared, from_user,"
-                " created_at, updated_at, touched_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                " project_id, created_at, updated_at, touched_at)"
+                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (uid, title, notes or "", max(0, min(2, int(priority))), _area(area),
                  _energy(energy), _minutes(minutes),
                  due.isoformat() if due else None, due_time,
                  json.dumps(rule) if rule else None,
                  anchor.isoformat() if anchor else None,
                  "someday" if status == "someday" else "open", capture_id, int(bool(shared)), from_user,
-                 stamp, stamp, stamp))
+                 project_id, stamp, stamp, stamp))
             tid = cur.lastrowid
             for i, s in enumerate(x.strip() for x in steps or [] if x and x.strip()):
                 c.execute("INSERT INTO subtasks(task_id, title, position, created_at)"
@@ -263,6 +269,11 @@ class Tasks:
             new["minutes"] = _minutes(new["minutes"])
         if "shared" in new:
             new["shared"] = int(bool(new["shared"]))
+        if "project_id" in new:
+            if (new["project_id"] or None) == t["project_id"]:
+                del new["project_id"]  # unchanged (also keeps a partner's project on shared tasks)
+            else:
+                new["project_id"] = self._own_project(uid, new["project_id"])
         if "due_time" in new:
             new["due_time"] = _valid_time(new["due_time"])
         if "due_date" in new:
@@ -612,6 +623,113 @@ class Tasks:
                if not t["due_date"] and not (t["not_now_until"] and t["not_now_until"] > now)]
         return sorted(out, key=lambda t: (-t["priority"], t["id"]))
 
+    # ---------- projects ----------
+    def _own_project(self, uid: int, project_id) -> int | None:
+        """Validate a project id for a task: must be one of this user's open projects."""
+        if not project_id:
+            return None
+        row = self.db.one("SELECT id FROM projects WHERE id=? AND user_id=? AND status='open'",
+                          (int(project_id), uid))
+        if not row:
+            raise NotFound(f"project {project_id}")
+        return row["id"]
+
+    @staticmethod
+    def _project_name(name: str) -> str:
+        name = " ".join((name or "").split()).strip(" :#")[:PROJECT_NAME_MAX]
+        if not name:
+            raise ValueError("project name is required")
+        return name
+
+    def find_project(self, uid: int, name: str) -> dict | None:
+        """An open project with this name (case-insensitive)."""
+        row = self.db.one("SELECT * FROM projects WHERE user_id=? AND status='open'"
+                          " AND lower(name)=lower(?)", (uid, " ".join((name or "").split())))
+        return dict(row) if row else None
+
+    def create_project(self, uid: int, name: str, capture_id: int | None = None) -> dict:
+        name = self._project_name(name)
+        if (existing := self.find_project(uid, name)):
+            return self.project(uid, existing["id"])
+        stamp = self._stamp()
+        with self.db.tx() as c:
+            pid = c.execute("INSERT INTO projects(user_id, name, capture_id, created_at, updated_at)"
+                            " VALUES(?,?,?,?,?)", (uid, name, capture_id, stamp, stamp)).lastrowid
+        self._changed()
+        return self.project(uid, pid)
+
+    def _project_row(self, uid: int, project_id: int) -> dict:
+        row = self.db.one("SELECT * FROM projects WHERE id=? AND user_id=?", (project_id, uid))
+        if not row:
+            raise NotFound(f"project {project_id}")
+        return dict(row)
+
+    def _project_summary(self, p: dict) -> dict:
+        counts = {r["status"]: r["n"] for r in self.db.query(
+            "SELECT status, COUNT(*) AS n FROM tasks WHERE project_id=? AND status!='deleted'"
+            " GROUP BY status", (p["id"],))}
+        p["open"], p["done"], p["someday"] = (counts.get(k, 0) for k in ("open", "done", "someday"))
+        nxt = self.db.one("SELECT id, title FROM tasks WHERE project_id=? AND status='open' ORDER BY"
+                          " due_date IS NULL, due_date, priority DESC, id LIMIT 1", (p["id"],))
+        p["next"] = dict(nxt) if nxt else None
+        return p
+
+    def projects(self, uid: int, status: str = "open") -> list[dict]:
+        rows = self.db.query("SELECT * FROM projects WHERE user_id=? AND status=?"
+                             " ORDER BY updated_at DESC, id DESC", (uid, status))
+        return [self._project_summary(dict(r)) for r in rows]
+
+    def project(self, uid: int, project_id: int) -> dict:
+        """A project with all its tasks: open, someday, and the last done ones."""
+        p = self._project_summary(self._project_row(uid, project_id))
+        rows = self.db.query("SELECT * FROM tasks WHERE project_id=? AND user_id=? AND status IN"
+                             " ('open', 'someday') ORDER BY status, due_date IS NULL, due_date,"
+                             " due_time IS NULL, due_time, priority DESC, id", (project_id, uid))
+        p["tasks"] = [self._decorate(dict(r)) for r in rows]
+        done = self.db.query("SELECT * FROM tasks WHERE project_id=? AND user_id=? AND status='done'"
+                             " ORDER BY completed_at DESC LIMIT 20", (project_id, uid))
+        p["done_tasks"] = [self._decorate(dict(r)) for r in done]
+        return p
+
+    def update_project(self, uid: int, project_id: int, name: str | None = None,
+                       status: str | None = None) -> dict:
+        """Rename, finish (open tasks move to Someday, so nothing nags) or reopen a project."""
+        p = self._project_row(uid, project_id)
+        sets: dict = {}
+        if name is not None:
+            name = self._project_name(name)
+            other = self.find_project(uid, name)
+            if other and other["id"] != project_id:
+                raise ValueError(f"you already have a project called {other['name']}")
+            sets["name"] = name
+        if status is not None:
+            if status not in ("open", "done"):
+                raise ValueError("status must be open or done")
+            if status == "open" and p["status"] != "open" and self.find_project(uid, sets.get("name", p["name"])):
+                raise ValueError("an open project already has that name")
+            sets["status"] = status
+            sets["done_at"] = self._stamp() if status == "done" else None
+        if not sets:
+            return self.project(uid, project_id)
+        sets["updated_at"] = self._stamp()
+        with self.db.tx() as c:
+            c.execute(f"UPDATE projects SET {', '.join(f'{k}=?' for k in sets)} WHERE id=?",
+                      (*sets.values(), project_id))
+            if sets.get("status") == "done":
+                c.execute("UPDATE tasks SET status='someday', someday_reason=?, pinned_on=NULL"
+                          " WHERE project_id=? AND status='open'", (f"project {p['name']} finished", project_id))
+        self._changed()
+        return self.project(uid, project_id)
+
+    def delete_project(self, uid: int, project_id: int) -> dict:
+        """Remove the project; its tasks stay, just without a project."""
+        self._project_row(uid, project_id)
+        with self.db.tx() as c:
+            c.execute("UPDATE tasks SET project_id=NULL WHERE project_id=?", (project_id,))
+            c.execute("DELETE FROM projects WHERE id=?", (project_id,))
+        self._changed()
+        return {"ok": True}
+
     def snoozed(self, uid: int) -> list[dict]:
         """Open tasks hidden with "Not now" that haven't come back yet."""
         now = self.now().isoformat(timespec="seconds")
@@ -638,6 +756,7 @@ class Tasks:
         out["anytime"].sort(key=lambda t: (-t["priority"], t["id"]))
         out["focus"] = self.focus(uid)
         out["pinned"] = [t for t in self.open_tasks(uid) if t["pinned"]]
+        out["projects"] = self.projects(uid)
         out["hyperfocus_until"] = self.hyperfocus_until(uid)
         out["done_today"] = self.done_on(uid, today)
         out["someday_count"] = self.db.one(

@@ -33,6 +33,18 @@ CREATE TABLE IF NOT EXISTS api_tokens (
     last_used_at  TEXT
 );
 
+CREATE TABLE IF NOT EXISTS projects (
+    id          INTEGER PRIMARY KEY,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'open',       -- open | done
+    capture_id  INTEGER REFERENCES captures(id) ON DELETE SET NULL,  -- started by this brain dump
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    done_at     TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id, status);
+
 CREATE TABLE IF NOT EXISTS tasks (
     id             INTEGER PRIMARY KEY,
     user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -268,6 +280,8 @@ class DB:
         ("tasks", "shared", "INTEGER NOT NULL DEFAULT 0"),
         ("tasks", "from_user", "INTEGER REFERENCES users(id) ON DELETE SET NULL"),
         ("completions", "by_user", "INTEGER"),
+        ("tasks", "project_id", "INTEGER REFERENCES projects(id) ON DELETE SET NULL"),
+        ("captures", "project_id", "INTEGER REFERENCES projects(id) ON DELETE SET NULL"),
     ]
 
     def _migrate(self) -> None:

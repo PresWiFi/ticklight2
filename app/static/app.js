@@ -82,6 +82,7 @@ function metaBits(t) {
   if (t.subtasks.length) bits.push(h("span", { class: "chip" }, `☑ ${t.subtasks_done}/${t.subtasks.length}`));
   if (t.shared) bits.push(h("span", { class: "chip shared" }, t.owner_name ? `🏠 ${t.owner_name}'s` : "🏠 shared"));
   if (t.from_name) bits.push(h("span", { class: "chip from" }, `💌 from ${t.from_name}`));
+  if (t.project) bits.push(h("span", { class: "chip project", onclick: () => openProject(t.project.id) }, `📁 ${t.project.name}`));
   return bits;
 }
 
@@ -102,7 +103,7 @@ function focusCard(t, i) {
       h("button", { onclick: (e) => breakdown(t.id, e.currentTarget), title: "Split into tiny steps" }, "🪜", h("span", { class: "lbl" }, " Break it down"))));
 }
 
-function listItem(t) {
+function listItem(t, opts = {}) {
   const sub = [];
   if (t.carried_over) sub.push(fmtDay(t.due_date));
   else if (t.due_time) sub.push(t.due_time);
@@ -110,8 +111,9 @@ function listItem(t) {
   if (t.next_step) sub.push("↳ " + t.next_step.title);
   if (t.shared) sub.push(t.owner_name ? `🏠 ${t.owner_name}` : "🏠");
   if (t.from_name) sub.push(`💌 ${t.from_name}`);
+  if (t.project && !opts.inProject) sub.unshift(`📁 ${t.project.name}`);
   return h("li", { class: `${t.carried_over ? "carried" : ""} p${t.priority}` },
-    h("button", { class: "check", title: "Done", onclick: () => complete(t.id) }),
+    h("button", { type: "button", class: "check", title: "Done", onclick: () => complete(t.id) }),
     t.area ? h("span", { class: `dot area-${t.area}`, title: t.area }) : null,
     h("div", { class: "t", onclick: () => openEdit(t.id) },
       t.title, sub.length ? h("div", { class: "sub" }, sub.join(" · ")) : null));
@@ -141,6 +143,7 @@ function render() {
   $("#upcoming").replaceChildren(...(up.length ? up : [h("li", { class: "muted" }, "Clear week ahead.")]));
   $("#anytime").replaceChildren(...b.anytime.map((t) => listItem(t)));
   $("#anytime-count").textContent = b.anytime.length || "";
+  renderProjects(b.projects || []);
   $("#someday-count").textContent = b.someday_count;
   // stats
   const s = b.stats;
@@ -168,6 +171,7 @@ async function load() {
     board = await api("/api/board");
     version = board.version;
     render();
+    if ($("#project").open) refreshProject();
   } catch (e) {
     console.error(e);
   }
@@ -261,7 +265,8 @@ $("#capture").addEventListener("submit", async (e) => {
     const r = await post("/api/capture?wait=1", { text });
     const n = r.tasks.length;
     const names = r.tasks.slice(0, 3).map((t) => t.title).join(", ") + (n > 3 ? "…" : "");
-    toast(`➕ ${n} task${n === 1 ? "" : "s"}: ${names}`, {
+    const into = (r.projects || []).map((p) => `📁 ${p.name}${p.new ? " (new)" : ""}`).join(", ");
+    toast(`➕ ${n} task${n === 1 ? "" : "s"}: ${names}${into ? " → " + into : ""}`, {
       ms: 8000,
       undo: async () => { await post(`/api/captures/${r.capture_id}/undo`); load(); },
     });
@@ -303,6 +308,7 @@ async function openEdit(id) {
   form.minutes.value = t.minutes || "";
   form.priority.value = t.priority;
   form.shared.checked = !!t.shared;
+  fillProjectSelect(t.project);
   $("#edit-repeat").textContent = t.recurrence_text ? `🔁 ${t.recurrence_text} · streak ${t.current_streak} (best ${t.best_streak})` : "";
   renderSteps(t);
   for (const id of ["#edit-delete", "#edit-someday", "#edit-breakdown", "#edit-steps", "#edit-step-input"])
@@ -319,14 +325,18 @@ function formValues() {
     area: form.area.value || null, energy: form.energy.value ? +form.energy.value : null,
     minutes: form.minutes.value ? +form.minutes.value : null, priority: +form.priority.value,
     shared: form.shared.checked,
+    project_id: form.project_id.value && form.project_id.value !== "new" ? +form.project_id.value : null,
   };
 }
 
 edit.addEventListener("close", async () => {
   if (edit.returnValue !== "save") return;
   try {
-    if (editing) await api(`/api/tasks/${editing.id}`, { method: "PATCH", body: formValues() });
-    else await post("/api/tasks", formValues());
+    const body = formValues();
+    const newName = $("#edit-new-project").value.trim();
+    if (form.project_id.value === "new" && newName) body.project_id = (await post("/api/projects", { name: newName })).id;
+    if (editing) await api(`/api/tasks/${editing.id}`, { method: "PATCH", body });
+    else await post("/api/tasks", body);
   } catch (e) { toast("Couldn't save: " + e.message); }
   load();
 });
@@ -367,6 +377,108 @@ $("#edit-step-input").addEventListener("paste", async (e) => {
 });
 
 // ---------- someday ----------
+// ---------- projects ----------
+function fillProjectSelect(current) {
+  const list = [...(board?.projects || [])];
+  if (current && !list.some((p) => p.id === current.id)) list.push(current);  // e.g. a partner's project
+  form.project_id.replaceChildren(h("option", { value: "" }, "–"),
+    ...list.map((p) => h("option", { value: p.id }, p.name)), h("option", { value: "new" }, "＋ New project…"));
+  form.project_id.value = current ? current.id : "";
+  $("#edit-new-project").value = "";
+  $("#edit-new-project-label").hidden = true;
+}
+$("#edit-project").addEventListener("change", (e) => {
+  const isNew = e.target.value === "new";
+  $("#edit-new-project-label").hidden = !isNew;
+  if (isNew) $("#edit-new-project").focus();
+});
+
+function renderProjects(projects) {
+  const newInput = h("input", { class: "pnew", maxlength: 40, placeholder: "＋ New project (Enter)",
+    onkeydown: async (e) => {
+      if (e.key !== "Enter" || !e.target.value.trim()) return;
+      e.preventDefault();
+      const p = await post("/api/projects", { name: e.target.value });
+      await load();
+      openProject(p.id);
+    } });
+  const rows = projects.map((p) => {
+    const total = p.open + p.done;
+    return h("li", {},
+      h("div", { class: "t", onclick: () => openProject(p.id) }, "📁 ", p.name,
+        h("div", { class: "sub" }, p.next ? "next: " + p.next.title : p.done ? "All done 🎉 Tap to finish it" : "Nothing in it yet")),
+      total ? h("span", { class: "pcount" }, `${p.done}/${total}`) : null,
+      total ? h("div", { class: "bar pbar" }, h("div", { style: `width:${Math.round((100 * p.done) / total)}%` })) : null);
+  });
+  if (!projects.length) rows.push(h("li", { class: "muted small" },
+    "Start a brain dump line with a heading like “Garage:”, or dump a few related things, and they'll be grouped here."));
+  $("#projects").replaceChildren(...rows, h("li", {}, newInput));
+}
+
+let project = null;
+async function openProject(id) {
+  project = await api(`/api/projects/${id}`);
+  renderProject();
+  if (!$("#project").open) $("#project").showModal();
+}
+async function refreshProject() {
+  try { project = await api(`/api/projects/${project.id}`); renderProject(); }
+  catch { $("#project").close(); }
+}
+function renderProject() {
+  const p = project, total = p.open + p.done;
+  if (document.activeElement !== $("#pj-name")) $("#pj-name").value = p.name;
+  $("#pj-bar").style.width = total ? Math.round((100 * p.done) / total) + "%" : "0";
+  $("#pj-stats").textContent = [`${p.done} of ${total} done`, p.someday && `${p.someday} in Someday`,
+    p.status === "done" && "finished"].filter(Boolean).join(" · ");
+  const open = p.tasks.filter((t) => t.status === "open"), parked = p.tasks.filter((t) => t.status === "someday");
+  const parkedItem = (t) => h("li", {}, h("div", { class: "t", onclick: () => openEdit(t.id) }, "📦 ", t.title),
+    h("button", { type: "button", onclick: async () => { await post(`/api/tasks/${t.id}/bring-back`); load(); } }, "↩️"));
+  $("#pj-tasks").replaceChildren(...(open.length || parked.length
+    ? [...open.map((t) => listItem(t, { inProject: true })), ...parked.map(parkedItem)]
+    : [h("li", { class: "muted" }, p.done ? "Everything's done. 🎉" : "Nothing yet. Add the first thing above.")]));
+  $("#pj-done-h").textContent = p.done_tasks.length ? `✅ Done (${p.done})` : "";
+  $("#pj-done").replaceChildren(...p.done_tasks.map((t) => h("li", { class: "muted" }, "✓ ", t.title)));
+  $("#pj-finish").textContent = p.status === "done" ? "↩️ Reopen" : "🏁 Finish project";
+  $("#pj-add").closest(".row").hidden = p.status === "done";
+}
+async function renameProject() {
+  const name = $("#pj-name").value.trim();
+  if (!name || name === project.name) { $("#pj-name").value = project.name; return; }
+  try { await api(`/api/projects/${project.id}`, { method: "PATCH", body: { name } }); toast("📁 Renamed"); load(); }
+  catch (e) { toast(e.message); $("#pj-name").value = project.name; }
+}
+$("#pj-name").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); e.target.blur(); } });
+$("#pj-name").addEventListener("blur", renameProject);
+async function addToProject() {
+  const text = $("#pj-add").value.trim();
+  if (!text) return;
+  $("#pj-add").value = "";
+  $("#pj-add-go").disabled = true;
+  try {
+    const r = await post(`/api/capture?wait=1&project_id=${project.id}`, { text });
+    toast(`➕ ${r.tasks.length} added to ${project.name}`, { undo: async () => { await post(`/api/captures/${r.capture_id}/undo`); load(); } });
+  } catch (e) { $("#pj-add").value = text; toast("Couldn't add that: " + e.message); }
+  $("#pj-add-go").disabled = false;
+  load();
+}
+$("#pj-add-go").addEventListener("click", addToProject);
+$("#pj-add").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addToProject(); } });
+$("#pj-finish").addEventListener("click", async () => {
+  const reopen = project.status === "done";
+  if (!reopen && project.open && !confirm(`Finish ${project.name}? Its ${project.open} open task${project.open === 1 ? "" : "s"} move to Someday.`)) return;
+  await api(`/api/projects/${project.id}`, { method: "PATCH", body: { status: reopen ? "open" : "done" } });
+  toast(reopen ? `📁 ${project.name} is back` : `🏁 ${project.name} finished. Nice work.`);
+  if (!reopen) $("#project").close();
+  load();
+});
+$("#pj-delete").addEventListener("click", async () => {
+  if (!confirm(`Delete the project ${project.name}? Its tasks stay on your list.`)) return;
+  await api(`/api/projects/${project.id}`, { method: "DELETE" });
+  $("#project").close();
+  load();
+});
+
 async function openSomeday() {
   const items = await api("/api/tasks?status=someday");
   $("#someday-list").replaceChildren(...(items.length ? items.map((t) => h("li", {},

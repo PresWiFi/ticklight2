@@ -79,8 +79,12 @@
       <ul id="upcoming" class="list"></ul>
     </div>
     <div class="col">
-      <h2 class="toggle" id="anytime-toggle">Anytime <span id="anytime-count" class="muted small"></span> <span class="caret">▸</span></h2>
-      <ul id="anytime" class="list" hidden></ul>
+      <h2 class="toggle open" id="anytime-toggle">Anytime <span id="anytime-count" class="muted small"></span> <span class="caret">▸</span></h2>
+      <ul id="anytime" class="list"></ul>
+    </div>
+    <div class="col">
+      <h2>Projects</h2>
+      <ul id="projects" class="list projects"></ul>
     </div>
   </section>
 </main>
@@ -162,6 +166,12 @@
       <label>Priority
         <select name="priority"><option value="0">low</option><option value="1">normal</option><option value="2">high</option></select>
       </label>
+      <label>Project
+        <select name="project_id" id="edit-project"></select>
+      </label>
+      <label id="edit-new-project-label" hidden>New project name
+        <input id="edit-new-project" maxlength="40" placeholder="e.g. Garage">
+      </label>
     </div>
     <div id="edit-repeat" class="muted small"></div>
     <label class="share-row"><input type="checkbox" name="shared"> 🏠 Shared with your people (either of you can tick it)</label>
@@ -180,6 +190,25 @@
 </dialog>
 
 <!-- someday -->
+<dialog id="project">
+  <form method="dialog">
+    <input id="pj-name" class="big" maxlength="40" title="Rename">
+    <div class="bar"><div id="pj-bar"></div></div>
+    <p id="pj-stats" class="muted small"></p>
+    <div class="row"><textarea id="pj-add" rows="1" placeholder="Add to this project (a list or brain dump works)"></textarea>
+      <button type="button" id="pj-add-go">Add</button></div>
+    <ul id="pj-tasks" class="list"></ul>
+    <h3 id="pj-done-h" class="muted"></h3>
+    <ul id="pj-done" class="list"></ul>
+    <div class="row">
+      <button type="button" id="pj-delete" class="danger">Delete</button>
+      <button type="button" id="pj-finish">🏁 Finish project</button>
+      <span class="spacer"></span>
+      <button class="primary">Close</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="someday">
   <form method="dialog">
     <h2>Someday</h2>

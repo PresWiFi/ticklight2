@@ -219,7 +219,7 @@ code { display: block; padding: 8px; border-radius: 8px; background: var(--panel
 /* ---------- display mode (desk monitor) ---------- */
 body.display { --fs: 21px; }
 body.display #capture, body.display .tools button:not(#btn-display):not(#btn-hf), body.display .banner.hf button, body.display .list .check,
-body.display .card .actions, body.display #edit-breakdown { display: none; }
+body.display .card .actions, body.display #edit-breakdown, body.display .projects .pnew { display: none; }
 body.display .clock #time { font-size: 4em; }
 body.display header { justify-content: space-between; }
 
@@ -370,10 +370,17 @@ body.display #session .s-controls, body.display #s-min { display: none; }
 .reacts button.on { border-color: var(--accent); }
 
 /* projects */
-.projects .pcount { font-size: .8em; color: var(--muted); white-space: nowrap; }
-.projects .pbar { width: 54px; height: 5px; margin: 0; flex: none; }
-.projects .pbar div, #pj-bar { height: 100%; background: var(--ok); }
-.projects .pnew { width: 100%; padding: 6px 8px; border-radius: 8px; border: 1px dashed var(--line); background: none; color: var(--text); }
+.projects-h { margin-top: 22px; }
+.projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.pcard { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 12px 14px; cursor: pointer; color: var(--text); font: inherit; }
+.pcard:hover { border-color: var(--accent); }
+.pcard .pname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcard .bar { margin: 8px 0 6px; }
+.pcard .bar div, #pj-bar { height: 100%; background: var(--ok); }
+.pcard .psub { font-size: .8em; color: var(--muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.projects .pnew, .projects p { grid-column: 1 / -1; }
+.projects .pnew { padding: 8px 10px; border-radius: 8px; border: 1px dashed var(--line); background: none; color: var(--text); }
 .chip.project { background: color-mix(in srgb, var(--accent) 15%, transparent); }
 #pj-name { border: none; background: none; padding: 2px 0; }
 #pj-name:focus { background: var(--panel-2); padding: 2px 6px; }

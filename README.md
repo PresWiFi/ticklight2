@@ -14,7 +14,8 @@ A self-hosted ADHD task system for an always-on desk monitor, your phone, your w
 - **Projects.** Brain dumps sort into your projects: the AI files tasks under a project you already
   have, and starts a new one when you name it or several things in one dump work toward one goal.
   Without AI, a line like `Garage:` files the lines under it (until a blank line). Tasks stay in
-  Today / Coming up / Anytime with a 📁 label; the Projects list shows progress and the next task.
+  Today / Coming up / Anytime with a 📁 label; Projects (under Focus) shows each one's progress
+  and next task. Tap one to see all its tasks.
   Open a project to add to it (a list or brain dump works), rename it, or 🏁 finish it (what's
   left moves to Someday).
 - **Today's three.** 📌 up to three picks a day; they lead Focus.

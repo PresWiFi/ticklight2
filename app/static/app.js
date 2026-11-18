@@ -394,7 +394,7 @@ $("#edit-project").addEventListener("change", (e) => {
 });
 
 function renderProjects(projects) {
-  const newInput = h("input", { class: "pnew", maxlength: 40, placeholder: "＋ New project (Enter)",
+  const newInput = h("input", { class: "pnew", maxlength: 40, placeholder: "＋ New project (type a name, Enter)",
     onkeydown: async (e) => {
       if (e.key !== "Enter" || !e.target.value.trim()) return;
       e.preventDefault();
@@ -402,17 +402,18 @@ function renderProjects(projects) {
       await load();
       openProject(p.id);
     } });
-  const rows = projects.map((p) => {
+  const cards = projects.map((p) => {
     const total = p.open + p.done;
-    return h("li", {},
-      h("div", { class: "t", onclick: () => openProject(p.id) }, "📁 ", p.name,
-        h("div", { class: "sub" }, p.next ? "next: " + p.next.title : p.done ? "All done 🎉 Tap to finish it" : "Nothing in it yet")),
-      total ? h("span", { class: "pcount" }, `${p.done}/${total}`) : null,
-      total ? h("div", { class: "bar pbar" }, h("div", { style: `width:${Math.round((100 * p.done) / total)}%` })) : null);
+    return h("button", { type: "button", class: "pcard", title: "See all its tasks", onclick: () => openProject(p.id) },
+      h("div", { class: "pname" }, "📁 ", p.name),
+      h("div", { class: "bar" }, h("div", { style: `width:${total ? Math.round((100 * p.done) / total) : 0}%` })),
+      h("div", { class: "psub" }, total ? `${p.done}/${total} done` : "Empty",
+        p.someday ? ` · ${p.someday} parked` : "",
+        h("br"), p.next ? "next: " + p.next.title : p.done ? "All done 🎉 Tap to finish it" : "Add the first task"));
   });
-  if (!projects.length) rows.push(h("li", { class: "muted small" },
-    "Start a brain dump line with a heading like “Garage:”, or dump a few related things, and they'll be grouped here."));
-  $("#projects").replaceChildren(...rows, h("li", {}, newInput));
+  const hint = projects.length ? null : h("p", { class: "muted small" },
+    "Start a brain dump line with a heading like “Garage:”, or dump a few related things, and they'll be grouped here.");
+  $("#projects").replaceChildren(...cards, ...(hint ? [hint] : []), newInput);
 }
 
 let project = null;

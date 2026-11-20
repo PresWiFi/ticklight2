@@ -655,7 +655,7 @@ function b64ToBytes(s) {
 }
 const PUSH_TEXT = {
   on: "On for this phone", off: "Off for this phone", pending: "Connecting…",
-  "no-distributor": "Needs a push app. Install ntfy (Play Store), open it once, then tap Enable.",
+  "no-distributor": "Needs a push app. Install ntfy (Play Store), open it once, then tap Enable again.",
   failed: "Didn't work",
 };
 async function updatePushStatus() {
@@ -664,6 +664,10 @@ async function updatePushStatus() {
     const i = JSON.parse(NATIVE.info());
     st.textContent = (PUSH_TEXT[i.push] || i.push) + (i.push === "failed" && i.pushError ? `: ${i.pushError}` : "")
       + (i.push === "on" && i.distributor ? ` (via ${i.distributor.split(".").pop()})` : "");
+    // What the app can see, so a stuck setup says why (older app versions don't report ntfy)
+    if (i.push !== "on" && "ntfy" in i)
+      st.textContent += i.ntfy ? ` · ntfy ${i.ntfy} is installed` + (i.distributors ? "" : " but isn't offering push to other apps")
+        : " · ntfy isn't installed (or the app can't see it)";
     $("#push-enable").hidden = false;
     $("#push-enable").textContent = i.push === "on" ? "Turn off" : "Enable notifications";
     $("#push-test").hidden = i.push !== "on";

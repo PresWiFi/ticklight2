@@ -10,6 +10,8 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import android.view.Gravity
 import android.view.inputmethod.EditorInfo
@@ -39,6 +41,7 @@ class MainActivity : Activity() {
         const val EXTRA_PATH = "path"
         private const val REQ_MIC = 1
         private const val REQ_NOTIFY = 2
+        private const val NTFY = "io.heckel.ntfy"
         var live: MainActivity? = null
     }
 
@@ -242,10 +245,35 @@ class MainActivity : Activity() {
                     UnifiedPush.saveDistributor(this, distributors.first())
                     UnifiedPush.register(this, messageForDistributor = "Ticklight", vapid = vapid)
                 }
+                // ntfy is installed but didn't show up as a push app: ask it directly anyway
+                ntfyVersion() != null -> {
+                    UnifiedPush.saveDistributor(this, NTFY)
+                    UnifiedPush.register(this, messageForDistributor = "Ticklight", vapid = vapid)
+                }
                 else -> store.push = "no-distributor"
             }
             pushChanged()
+            if (store.push == "pending") {
+                // The push app answers within seconds; don't sit on "Connecting…" forever
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (store.push == "pending") {
+                        store.push = "failed"
+                        store.pushError = "${distributorName()} didn't answer. Open it, make sure it's allowed to " +
+                            "run in the background, then tap Enable again"
+                        pushChanged()
+                    }
+                }, 30_000)
+            }
         }
+    }
+
+    private fun ntfyVersion(): String? = runCatching {
+        packageManager.getPackageInfo(NTFY, 0).versionName ?: "?"
+    }.getOrNull()
+
+    private fun distributorName(): String {
+        val pkg = runCatching { UnifiedPush.getSavedDistributor(this) }.getOrNull() ?: return "The push app"
+        return if (pkg == NTFY) "ntfy" else pkg.substringAfterLast('.')
     }
 
     private fun disablePush() {
@@ -280,6 +308,7 @@ class MainActivity : Activity() {
             .put("pushError", store.pushError)
             .put("distributor", runCatching { UnifiedPush.getAckDistributor(this@MainActivity) }.getOrNull() ?: "")
             .put("distributors", runCatching { UnifiedPush.getDistributors(this@MainActivity).size }.getOrDefault(0))
+            .put("ntfy", ntfyVersion() ?: "")
             .toString()
 
         @JavascriptInterface

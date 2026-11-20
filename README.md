@@ -18,6 +18,9 @@ A self-hosted ADHD task system for an always-on desk monitor, your phone, your w
   and next task. Tap one to see all its tasks.
   Open a project to add to it (a list or brain dump works), rename it, or 🏁 finish it (what's
   left moves to Someday).
+- **Project mode.** 🎯 in a project narrows the whole dashboard (Focus, lists, desk monitor) to that
+  project, plus today's appointments so nothing timed gets missed. The capture box and 🎙 add to it.
+  **Show everything** in the banner ends it. It follows you across devices.
 - **Today's three.** 📌 up to three picks a day; they lead Focus.
 - **Routines.** ☀️ Morning launch (meds, energy, pick today's three, brain dump), 🌙 evening shutdown
   (what you did, park leftovers, brain dump, tomorrow's first thing), 🧹 weekly reset (one decision

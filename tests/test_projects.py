@@ -59,6 +59,7 @@ def test_capture_into_a_project(tmp_path, monkeypatch):
         fake_ai(m, [{"title": "Order boxes", "project": "Other"}, {"title": "Call movers", "project": ""}])
         r = c.post(f"/api/capture?wait=1&project_id={pid}", json={"text": "boxes, movers"}).json()
         assert titles(r) == {"Order boxes": "Move", "Call movers": "Move"}
+        assert r["projects"] == [{"id": pid, "name": "Move", "new": False}]
         r = c.post(f"/api/capture?wait=1&project_id={pid}", json={"text": "label boxes\npack books"})
         assert c.get(f"/api/projects/{pid}").json()["open"] == 4
         assert c.post("/api/capture?wait=1&project_id=999", json={"text": "x"}).status_code == 404
@@ -100,3 +101,24 @@ def test_done_by_day(tmp_path, monkeypatch):
         assert d["day"] == d["today"] and [x["title"] for x in d["tasks"]] == ["water plants"]
         assert c.get("/api/done?day=2020-01-01").json()["tasks"] == []
         assert c.get("/api/done?day=nope").status_code == 422
+
+
+def test_project_mode(tmp_path, monkeypatch):
+    c, m = make_client(tmp_path, monkeypatch)
+    with c:
+        r = c.post("/api/capture?wait=1", json={"text": "Garage:\nbuy shelves\n\nbuy milk\ndentist today 23:59\nvet tomorrow 10am"}).json()
+        pid = r["projects"][0]["id"]
+        assert c.get("/api/board").json()["project_mode"] is None
+        assert c.put("/api/project-mode", json={"project_id": pid}).json()["project_mode"]["name"] == "Garage"
+        b = c.get("/api/board").json()
+        assert [t["title"] for t in b["focus"]] == ["buy shelves"]
+        assert [t["title"] for t in b["anytime"]] == ["buy shelves"]
+        assert [t["title"] for t in b["today"]] == ["dentist"]       # today's appointments still show
+        assert b["upcoming"] == []
+        # Finishing (or deleting) the project ends the mode
+        c.patch(f"/api/projects/{pid}", json={"status": "done"})
+        assert c.get("/api/board").json()["project_mode"] is None
+        c.patch(f"/api/projects/{pid}", json={"status": "open"})
+        assert c.get("/api/board").json()["project_mode"]["id"] == pid
+        assert c.put("/api/project-mode", json={"project_id": None}).json()["project_mode"] is None
+        assert c.put("/api/project-mode", json={"project_id": 999}).status_code == 404

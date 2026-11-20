@@ -49,6 +49,8 @@ class Capture:
         # "#home" / "#shared" on a line shares that line's task with your people
         share_home = bool(self.prefs and self.prefs.get(uid)["people"]["share_home"])
         projects: dict[str, dict] = {}  # lower-case name -> {"id", "name", "new"}
+        if forced and (p := self.tasks.db.one("SELECT id, name FROM projects WHERE id=?", (forced,))):
+            projects[p["name"].lower()] = {"id": p["id"], "name": p["name"], "new": False}
         try:
             names = [p["name"] for p in self.tasks.projects(uid)]
             items, method = await self.ai.triage(text, self.tasks.now(), names)

@@ -215,7 +215,7 @@ code { display: block; padding: 8px; border-radius: 8px; background: var(--panel
 
 /* ---------- display mode (desk monitor) ---------- */
 body.display { --fs: 21px; }
-body.display #capture, body.display .tools button:not(#btn-display):not(#btn-hf), body.display .banner.hf button, body.display .list .check,
+body.display #capture, body.display .tools button:not(#btn-display):not(#btn-hf), body.display .banner.hf button, body.display .banner.pmode button, body.display .list .check,
 body.display .card .actions, body.display #edit-breakdown, body.display .projects .pnew { display: none; }
 body.display .clock #time { font-size: 4em; }
 body.display header { justify-content: space-between; }
@@ -390,3 +390,6 @@ body.display #session .s-controls, body.display #s-min { display: none; }
 #done-list { max-height: min(60vh, 520px); overflow-y: auto; margin-top: 10px; }
 #done-list .when { font-size: .8em; color: var(--muted); white-space: nowrap; flex: none; min-width: 5.2em; }
 #done-list li.skipped .t { color: var(--muted); }
+.banner.pmode { display: flex; align-items: center; gap: 12px; border-color: var(--accent); flex: 1; font-weight: 600; }
+.banner.pmode button { margin-left: auto; font-weight: normal; }
+body.project-mode .projects .pnew { display: none; }

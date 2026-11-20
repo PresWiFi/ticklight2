@@ -297,6 +297,11 @@ def set_energy(body: EnergyIn, uid: int = User):
     return tasks.set_energy(uid, body.level)
 
 
+def _project_param(request: Request) -> int | None:
+    p = request.query_params.get("project_id", "")
+    return int(p) if p.isdigit() else None
+
+
 @app.post("/api/capture", status_code=202)
 async def capture_text(request: Request, wait: bool = False, uid: int = User):
     """Capture anything. JSON {"text": ...} or a plain-text body (handy for watch and
@@ -306,8 +311,7 @@ async def capture_text(request: Request, wait: bool = False, uid: int = User):
     else:
         text = (await request.body()).decode("utf-8", "replace")
     source = request.query_params.get("source", "web")[:20]
-    project = request.query_params.get("project_id")
-    cid = capture.record(uid, text, source, int(project) if project and project.isdigit() else None)
+    cid = capture.record(uid, text, source, _project_param(request))
     if wait:
         return await capture.process(uid, cid)
     spawn(process_capture(uid, cid))
@@ -326,7 +330,7 @@ async def capture_voice(request: Request, uid: int = User):
     text = await voice.transcribe(audio, f"voice.{ext}", mime)
     if not text:
         raise ValueError("couldn't hear anything")
-    result = await capture.run(uid, text, "voice")
+    result = await capture.process(uid, capture.record(uid, text, "voice", _project_param(request)))
     result["heard"] = text
     return result
 
@@ -383,6 +387,16 @@ def list_projects(status: str = "open", uid: int = User):
 @app.post("/api/projects", status_code=201)
 def create_project(body: ProjectIn, uid: int = User):
     return tasks.create_project(uid, body.name or "")
+
+
+class ModeIn(BaseModel):
+    project_id: int | None = None
+
+
+@app.put("/api/project-mode")
+def set_project_mode(body: ModeIn, uid: int = User):
+    """Narrow the dashboard to one project (null to show everything again)."""
+    return {"project_mode": tasks.set_project_mode(uid, body.project_id)}
 
 
 @app.get("/api/projects/{project_id}")

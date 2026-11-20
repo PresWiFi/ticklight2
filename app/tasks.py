@@ -559,14 +559,18 @@ class Tasks:
             self._changed()
         return moved
 
-    def focus(self, uid: int, n: int = 3, energy: int | None = None) -> list[dict]:
-        """The next few things worth doing, with a short reason for each."""
+    def focus(self, uid: int, n: int = 3, energy: int | None = None,
+              project_id: int | None = None) -> list[dict]:
+        """The next few things worth doing, with a short reason for each.
+        With project_id, only that project's tasks."""
         now = self.now()
         today = now.date()
         soon = (now + timedelta(hours=2)).strftime("%H:%M")
         energy = energy or self.energy(uid)["level"]
         scored = []
         for t in self.open_tasks(uid):
+            if project_id and t["project_id"] != project_id:
+                continue
             if t["not_now_until"] and t["not_now_until"] > now.isoformat(timespec="seconds"):
                 continue
             due = _d(t["due_date"])
@@ -730,6 +734,20 @@ class Tasks:
         self._changed()
         return {"ok": True}
 
+    def project_mode(self, uid: int) -> dict | None:
+        """The project the dashboard is narrowed to, if any (still open)."""
+        pid = self.db.get_meta(f"project_mode:{uid}")
+        if not pid:
+            return None
+        row = self.db.one("SELECT id, name FROM projects WHERE id=? AND user_id=? AND status='open'",
+                          (int(pid), uid))
+        return dict(row) if row else None
+
+    def set_project_mode(self, uid: int, project_id: int | None) -> dict | None:
+        self.db.set_meta(f"project_mode:{uid}", str(self._own_project(uid, project_id) or ""))
+        self._changed()
+        return self.project_mode(uid)
+
     def snoozed(self, uid: int) -> list[dict]:
         """Open tasks hidden with "Not now" that haven't come back yet."""
         now = self.now().isoformat(timespec="seconds")
@@ -741,8 +759,14 @@ class Tasks:
         today = self.today()
         horizon = today + timedelta(days=upcoming_days)
         out = {"today": [], "upcoming": [], "later": [], "anytime": []}
+        mode = self.project_mode(uid)
         for t in self.open_tasks(uid):
             d = _d(t["due_date"])
+            if mode and t["project_id"] != mode["id"]:
+                # Project mode: other tasks are hidden, except today's appointments
+                if d == today and t["due_time"]:
+                    out["today"].append(t)
+                continue
             if d is None:
                 out["anytime"].append(t)
             elif d <= today:
@@ -754,7 +778,8 @@ class Tasks:
         out["today"].sort(key=lambda t: (t["carried_over"], -t["priority"],
                                          t["due_time"] or "99", t["id"]))
         out["anytime"].sort(key=lambda t: (-t["priority"], t["id"]))
-        out["focus"] = self.focus(uid)
+        out["focus"] = self.focus(uid, project_id=mode["id"] if mode else None)
+        out["project_mode"] = mode
         out["pinned"] = [t for t in self.open_tasks(uid) if t["pinned"]]
         out["projects"] = self.projects(uid)
         out["hyperfocus_until"] = self.hyperfocus_until(uid)

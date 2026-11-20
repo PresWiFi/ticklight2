@@ -61,6 +61,9 @@ setInterval(tickClock, 1000);
 tickClock();
 
 // ---------- rendering ----------
+// In project mode, the dashboard's capture box and 🎙 file everything into that project
+const modeQS = () => board?.project_mode ? `&project_id=${board.project_mode.id}` : "";
+
 function fmtDay(iso) {
   const d = new Date(iso + "T00:00");
   const today = new Date(board.today_date + "T00:00");
@@ -123,9 +126,13 @@ function render() {
   const b = board;
   // focus
   const focus = $("#focus");
+  const pm = b.project_mode;
   focus.replaceChildren(...(b.focus.length
     ? b.focus.map(focusCard)
-    : [h("div", { class: "empty" }, "Nothing needs you right now. ✨", h("br"), "Dump anything on your mind above.")]));
+    : [pm ? h("div", { class: "empty" }, `Nothing left to do in ${pm.name}. 🎉`, h("br"), "Add more above, or exit project mode.")
+      : h("div", { class: "empty" }, "Nothing needs you right now. ✨", h("br"), "Dump anything on your mind above.")]));
+  document.body.classList.toggle("project-mode", !!pm);
+  input.placeholder = pm ? `Add to ${pm.name}. Anything you dump here goes into it.` : "Dump anything on your mind. I'll sort it.";
   // energy
   $("#energy").classList.toggle("auto", !b.energy.manual);
   for (const btn of document.querySelectorAll("#energy button"))
@@ -143,7 +150,7 @@ function render() {
   $("#upcoming").replaceChildren(...(up.length ? up : [h("li", { class: "muted" }, "Clear week ahead.")]));
   $("#anytime").replaceChildren(...b.anytime.map((t) => listItem(t)));
   $("#anytime-count").textContent = b.anytime.length || "";
-  renderProjects(b.projects || []);
+  renderProjects((b.projects || []).filter((p) => !pm || p.id === pm.id));
   $("#someday-count").textContent = b.someday_count;
   // stats
   const s = b.stats;
@@ -263,7 +270,7 @@ $("#capture").addEventListener("submit", async (e) => {
   autosize();
   $("#capture-status").textContent = "✨ Sorting your brain dump…";
   try {
-    const r = await post("/api/capture?wait=1", { text });
+    const r = await post(`/api/capture?wait=1${modeQS()}`, { text });
     const n = r.tasks.length;
     const names = r.tasks.slice(0, 3).map((t) => t.title).join(", ") + (n > 3 ? "…" : "");
     const into = (r.projects || []).map((p) => `📁 ${p.name}${p.new ? " (new)" : ""}`).join(", ");
@@ -442,6 +449,10 @@ function renderProject() {
   $("#pj-done-h").textContent = p.done_tasks.length ? `✅ Done (${p.done})` : "";
   $("#pj-done").replaceChildren(...p.done_tasks.map((t) => h("li", { class: "muted" }, "✓ ", t.title)));
   $("#pj-finish").textContent = p.status === "done" ? "↩️ Reopen" : "🏁 Finish project";
+  const inMode = board?.project_mode?.id === p.id;
+  $("#pj-mode").hidden = p.status === "done";
+  $("#pj-mode").textContent = inMode ? "Show everything" : "🎯 Project mode";
+  $("#pj-mode").title = inMode ? "Leave project mode" : "Show only this project on the dashboard";
   $("#pj-add").closest(".row").hidden = p.status === "done";
 }
 async function renameProject() {
@@ -474,6 +485,17 @@ $("#pj-finish").addEventListener("click", async () => {
   if (!reopen) $("#project").close();
   load();
 });
+async function setProjectMode(id) {
+  const r = await api("/api/project-mode", { method: "PUT", body: { project_id: id } });
+  toast(r.project_mode ? `🎯 ${r.project_mode.name} mode. Everything else is out of sight.` : "Showing everything again");
+  await load();
+}
+$("#pj-mode").addEventListener("click", async () => {
+  const on = board?.project_mode?.id !== project.id;
+  await setProjectMode(on ? project.id : null);
+  if (on) $("#project").close();
+});
+
 $("#pj-delete").addEventListener("click", async () => {
   if (!confirm(`Delete the project ${project.name}? Its tasks stay on your list.`)) return;
   await api(`/api/projects/${project.id}`, { method: "DELETE" });
@@ -687,6 +709,9 @@ const ROUTINE_LABEL = { morning: "☀️ Plan my day", evening: "🌙 Wind down"
 function renderBanners() {
   const b = board;
   const items = [];
+  if (b.project_mode)
+    items.push(h("div", { class: "banner pmode" }, `📁 ${b.project_mode.name} mode · only this project (and today's appointments)`,
+      h("button", { onclick: () => setProjectMode(null) }, "Show everything")));
   if (b.hyperfocus_until) {
     const mins = Math.max(0, Math.round((new Date(b.hyperfocus_until) - new Date()) / 60000));
     items.push(h("div", { class: "banner hf" }, `🎧 Hyperfocus · ${mins} min left · only meetings, meds, meals and deadlines get through`,
@@ -747,7 +772,7 @@ async function toggleVoice() {
     recorder = null;
     $("#capture-status").textContent = "🎙 Listening back…";
     try {
-      const r = await api("/api/capture/voice", { method: "POST", body: new Blob(chunks, { type }), headers: { "Content-Type": type } });
+      const r = await api(`/api/capture/voice?x=1${modeQS()}`, { method: "POST", body: new Blob(chunks, { type }), headers: { "Content-Type": type } });
       toast(h("span", {}, h("i", {}, `“${r.heard}”`), ` → ${r.tasks.length} task${r.tasks.length === 1 ? "" : "s"}`), {
         ms: 8000, undo: async () => { await post(`/api/captures/${r.capture_id}/undo`); load(); } });
     } catch (e) { toast("Voice failed: " + e.message); }

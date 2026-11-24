@@ -28,6 +28,7 @@ from .push import Push
 from .sessions import Sessions
 from .tasks import NotFound, Tasks
 from .voice import Voice, VoiceUnavailable
+from .wishlist import Wishlist
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"),
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -43,7 +44,8 @@ tasks = Tasks(db, settings.tz, energy_schedule=settings.energy_schedule,
 users = Users(db, tasks.now)
 ai = AI(settings)
 prefs = Prefs(db, settings.summary_time)
-capture = Capture(tasks, ai, prefs)
+wishlist = Wishlist(tasks)
+capture = Capture(tasks, ai, prefs, wishlist)
 voice = Voice(settings)
 push = Push(db, settings.vapid_subject or settings.base_url or "mailto:ticklight@localhost", tasks.now)
 coach = Coach(db, tasks, prefs, ai)
@@ -271,6 +273,7 @@ def board(uid: int = User):
                 t["owner_name"] = names.get(t["user_id"], "Partner")
             if t.get("from_user") and t["from_user"] != uid:
                 t["from_name"] = names.get(t["from_user"], "Partner")
+    b["wishlist"] = wishlist.summary(uid)
     b["pending_captures"] = db.one(
         "SELECT COUNT(*) FROM captures WHERE user_id=? AND status='pending'", (uid,))[0]
     return b
@@ -412,6 +415,35 @@ def update_project(project_id: int, body: ProjectIn, uid: int = User):
 @app.delete("/api/projects/{project_id}")
 def delete_project(project_id: int, uid: int = User):
     return tasks.delete_project(uid, project_id)
+
+
+class WishIn(BaseModel):
+    title: str | None = None
+    price: str | None = None
+    link: str | None = None
+    note: str | None = None
+    status: str | None = None
+
+
+@app.get("/api/wishes")
+def list_wishes(status: str = "want", uid: int = User):
+    return wishlist.list(uid, status)
+
+
+@app.post("/api/wishes", status_code=201)
+def add_wish(body: WishIn, uid: int = User):
+    """Title can carry a price and a link ("Headphones £200 https://…"); they're split out."""
+    return wishlist.add(uid, body.title or "", body.note or "")
+
+
+@app.patch("/api/wishes/{wish_id}")
+def update_wish(wish_id: int, body: WishIn, uid: int = User):
+    return wishlist.update(uid, wish_id, body.model_dump(exclude_unset=True))
+
+
+@app.delete("/api/wishes/{wish_id}")
+def delete_wish(wish_id: int, uid: int = User):
+    return wishlist.delete(uid, wish_id)
 
 
 @app.get("/api/tasks/{task_id}")

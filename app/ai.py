@@ -58,6 +58,10 @@ Rules:
 - "steps": [] if the task is one obvious action. Otherwise 2-5 concrete physical steps;
   the first must take under 2 minutes and need no decisions (e.g. "Open the bank app").
 - "someday": true for vague wishes and ideas ("learn piano one day"), else false.
+- "wish": true when it's a thing they want to buy or own but can't get right now ("I want a new
+  keyboard", "would love a Switch when I'm paid", a "Wishlist:" heading). The title is then just
+  the thing, keeping any price or link ("Mechanical keyboard £90"). Errands to buy something
+  needed now ("buy milk", "order printer ink") are tasks, not wishes. Else false.
 - "shared": true only if that item was tagged #home, #shared or #household; else false.
   Never put the tag in the title.
 - "project": the project the task belongs to, or "".
@@ -68,7 +72,7 @@ Rules:
   a party). Everyday one-off chores get "".
 
 Reply with JSON only, no prose:
-{{"tasks": [{{"title": "", "when": "", "priority": "normal", "area": "home", "energy": "low", "minutes": 10, "steps": [], "someday": false, "shared": false, "project": ""}}]}}"""
+{{"tasks": [{{"title": "", "when": "", "priority": "normal", "area": "home", "energy": "low", "minutes": 10, "steps": [], "someday": false, "wish": false, "shared": false, "project": ""}}]}}"""
 
 BREAKDOWN_PROMPT = """Break a task into tiny steps for someone with ADHD who is stuck.
 
@@ -116,6 +120,7 @@ def clean_triage(data: dict) -> list[dict]:
             "minutes": minutes,
             "steps": [_str(s, 100) for s in (t.get("steps") or [])[:6] if _str(s, 100)],
             "someday": bool(t.get("someday")),
+            "wish": t.get("wish") is True,
             "shared": t.get("shared") is True,
             "project": _str(t.get("project"), 40).strip(" :#"),
         })

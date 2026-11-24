@@ -19,13 +19,17 @@ PROJECT_HEADING = re.compile(r"^\s*(?:#+\s*)?([^:\n]{1,40}):\s*$")
 NOT_PROJECTS = {"today", "tonight", "tomorrow", "this week", "next week", "this weekend", "weekend",
                 "later", "someday", "soon", "todo", "to do", "to-do", "tasks", "notes", "ideas",
                 "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
+# "Wishlist:" heading files the lines under it on the wishlist; "wish: …" does it for one line.
+WISH_HEADINGS = {"wishlist", "wish list", "wishes", "wants", "want", "i want", "want list"}
+WISH_LINE = re.compile(r"^\s*(?:wish(?:list)?|want)\s*:\s*(\S.*)$", re.I)
 
 
 class Capture:
-    def __init__(self, tasks: Tasks, ai: AI, prefs=None):
+    def __init__(self, tasks: Tasks, ai: AI, prefs=None, wishlist=None):
         self.tasks = tasks
         self.ai = ai
         self.prefs = prefs
+        self.wishlist = wishlist
 
     def record(self, uid: int, text: str, source: str, project_id: int | None = None) -> int:
         """Store a capture. With project_id, everything in it goes into that project."""
@@ -49,11 +53,15 @@ class Capture:
         # "#home" / "#shared" on a line shares that line's task with your people
         share_home = bool(self.prefs and self.prefs.get(uid)["people"]["share_home"])
         projects: dict[str, dict] = {}  # lower-case name -> {"id", "name", "new"}
+        wishes: list[dict] = []
         if forced and (p := self.tasks.db.one("SELECT id, name FROM projects WHERE id=?", (forced,))):
             projects[p["name"].lower()] = {"id": p["id"], "name": p["name"], "new": False}
         try:
             names = [p["name"] for p in self.tasks.projects(uid)]
             items, method = await self.ai.triage(text, self.tasks.now(), names)
+            if self.wishlist:
+                wishes += [self.wishlist.add(uid, it["title"], capture_id=capture_id) for it in items if it["wish"]]
+                items = [it for it in items if not it["wish"]]
             pick = (lambda it: forced) if forced else self._project_picker(uid, capture_id, text, items, projects)
             created = [self._create(uid, capture_id, it, from_user=from_user, project_id=pick(it),
                                     shared=it["shared"] or (share_home and it["area"] == "home"))
@@ -61,7 +69,7 @@ class Capture:
         except AIUnavailable as e:
             log.info("capture %s: AI unavailable (%s), using parser", capture_id, e)
             method = "parser"
-            created = self._parse_lines(uid, capture_id, text, from_user, forced, projects)
+            created = self._parse_lines(uid, capture_id, text, from_user, forced, projects, wishes)
         except Exception:
             log.exception("capture %s failed", capture_id)
             with self.tasks.db.tx() as c:
@@ -73,7 +81,7 @@ class Capture:
                       (method, capture_id))
         self.tasks._changed()
         return {"capture_id": capture_id, "method": method, "tasks": created,
-                "projects": list(projects.values())}
+                "projects": list(projects.values()), "wishes": wishes}
 
     def _project(self, uid: int, capture_id: int, name: str, projects: dict) -> int:
         key = " ".join(name.split()).lower()
@@ -119,16 +127,34 @@ class Capture:
         return [(name, "\n".join(lines)) for name, lines in blocks if any(x.strip() for x in lines)]
 
     def _parse_lines(self, uid: int, capture_id: int, text: str, from_user: int | None,
-                     forced: int | None = None, projects: dict | None = None) -> list[dict]:
+                     forced: int | None = None, projects: dict | None = None,
+                     wishes: list | None = None) -> list[dict]:
         """No AI: one task per line (v1 quick-add syntax), indented/"+" lines are steps,
-        and a "Name:" line files the lines under it in that project."""
+        a "Name:" line files the lines under it in that project, and "Wishlist:" (or
+        "wish: …" on one line) puts things on the wishlist."""
         blocks = [(name, parser.split_bulk(body)) for name, body in self._blocks(text)]
         if sum(len(items) for _, items in blocks) > parser.MAX_BULK:
             raise ValueError(f"too many tasks at once (max {parser.MAX_BULK})")
         projects = {} if projects is None else projects
-        return [t for name, items in blocks
-                for t in self._parse_block(uid, capture_id, items, from_user,
-                                           forced or (self._project(uid, capture_id, name, projects) if name else None))]
+        wishes = [] if wishes is None else wishes
+        out = []
+        for name, items in blocks:
+            if self.wishlist:
+                is_wish = bool(name and name.lower() in WISH_HEADINGS)
+                keep = []
+                for line, subs in items:
+                    m = WISH_LINE.match(line)
+                    if is_wish or m:
+                        wishes.append(self.wishlist.add(uid, m.group(1) if m else line, capture_id=capture_id))
+                    else:
+                        keep.append((line, subs))
+                if is_wish:
+                    continue
+                items = keep
+            if items:
+                pid = forced or (self._project(uid, capture_id, name, projects) if name else None)
+                out += self._parse_block(uid, capture_id, items, from_user, pid)
+        return out
 
     def _parse_block(self, uid: int, capture_id: int, items, from_user: int | None,
                      project_id: int | None) -> list[dict]:
@@ -156,7 +182,7 @@ class Capture:
         return t
 
     def undo(self, uid: int, capture_id: int) -> int:
-        """Delete every task a capture created (e.g. the AI misread it)."""
+        """Delete every task and wish a capture created (e.g. the AI misread it)."""
         ids = [r["id"] for r in self.tasks.db.query(
             "SELECT id FROM tasks WHERE capture_id=? AND user_id=? AND status!='deleted'",
             (capture_id, uid))]
@@ -166,7 +192,7 @@ class Capture:
         for r in self.tasks.db.query("SELECT id FROM projects WHERE capture_id=? AND user_id=?", (capture_id, uid)):
             if not self.tasks.db.one("SELECT 1 FROM tasks WHERE project_id=? AND status!='deleted'", (r["id"],)):
                 self.tasks.delete_project(uid, r["id"])
-        return len(ids)
+        return len(ids) + (self.wishlist.undo_capture(uid, capture_id) if self.wishlist else 0)
 
     def recent(self, uid: int, limit: int = 10) -> list[dict]:
         rows = self.tasks.db.query(

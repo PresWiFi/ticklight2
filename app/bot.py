@@ -33,6 +33,7 @@ Reply to a task message to add steps to it.
 /energy – set your energy (low / medium / high)
 /today – everything for today
 /someday – parked tasks
+/wish headphones £80 – add to your wishlist (/wish on its own lists it)
 /session 25 – focus session on your top task (/session 25 12 for task 12, /session stop)
 /hyperfocus – only meetings, meds, meals and deadlines get through (/hyperfocus off)
 /done 12 · /undo 12 · /del 12
@@ -115,6 +116,7 @@ class Bot:
         a.add_handler(CommandHandler("energy", self.cmd_energy))
         a.add_handler(CommandHandler("today", self.cmd_today))
         a.add_handler(CommandHandler("someday", self.cmd_someday))
+        a.add_handler(CommandHandler(["wish", "wishlist", "want"], self.cmd_wish))
         a.add_handler(CommandHandler(["hyperfocus", "hf"], self.cmd_hyperfocus))
         a.add_handler(CommandHandler(["session", "focusnow"], self.cmd_session))
         a.add_handler(CommandHandler(["done", "undo", "del", "delete"], self.cmd_action))
@@ -269,6 +271,23 @@ class Bot:
                                    for t in items[:20]])
         await update.effective_message.reply_html(text, reply_markup=kb)
 
+    async def cmd_wish(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+        if not (uid := self.uid(update)):
+            return await self._deny(update)
+        wl = self.capture.wishlist
+        text = " ".join(ctx.args or [])
+        if text:
+            try:
+                w = wl.add(uid, text)
+            except ValueError as e:
+                return await update.effective_message.reply_text(str(e))
+            return await update.effective_message.reply_html(f"🎁 On the wishlist: <b>{esc(w['title'])}</b>")
+        items = wl.list(uid)
+        if not items:
+            return await update.effective_message.reply_text("Your wishlist is empty. /wish something to add it.")
+        await update.effective_message.reply_html("<b>🎁 Wishlist</b>\n" + "\n".join(
+            f"• {esc(w['title'])}" + (f"  {esc(w['price'])}" if w["price"] else "") for w in items[:60]))
+
     async def cmd_show(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         if not (uid := self.uid(update)):
             return await self._deny(update)
@@ -372,6 +391,9 @@ class Bot:
             lines.append(fmt_task(t, today) + parked)
         head = f"🎙 <i>“{esc(heard[:300])}”</i>\n" if heard else ""
         head += f"➕ {len(created)} task{'s' if len(created) != 1 else ''}"
+        if (wishes := result.get("wishes")):
+            head += f" · 🎁 {len(wishes)} on the wishlist"
+            lines += [f"🎁 {esc(w['title'])}" for w in wishes]
         if result["method"] == "parser" and self.ai.configured:
             head += "  <i>(AI was busy, sorted by rules)</i>"
         rows = [[Btn(f"✅ {t['title'][:40]}", callback_data=f"done:{t['id']}:x")]

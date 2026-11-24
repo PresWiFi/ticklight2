@@ -165,6 +165,12 @@ function render() {
     h("div", { class: "psub" }, done.length ? done.slice(0, 3).map((t) => t.title).join(" · ") + (done.length > 3 ? " …" : "") : ""),
     ...(done.length ? [] : [h("div", { class: "muted small" }, "Nothing ticked yet. Earlier days are in here too.")]));
   if ($("#done-dlg").open) renderDone();
+  const wl = b.wishlist || { count: 0, recent: [] };
+  $("#wish-card").replaceChildren(
+    h("div", { class: "pname" }, wl.count ? `🎁 Wishlist · ${wl.count}` : "🎁 Wishlist"),
+    h("div", { class: "psub" }, wl.count ? wl.recent.join(" · ") + (wl.count > wl.recent.length ? " …" : "")
+      : "Things you want but can't get yet. Press w to add one."));
+  if ($("#wish-dlg").open) renderWishes();
   renderBanners();
   renderPeople();
   renderGame();
@@ -274,7 +280,9 @@ $("#capture").addEventListener("submit", async (e) => {
     const n = r.tasks.length;
     const names = r.tasks.slice(0, 3).map((t) => t.title).join(", ") + (n > 3 ? "…" : "");
     const into = (r.projects || []).map((p) => `📁 ${p.name}${p.new ? " (new)" : ""}`).join(", ");
-    toast(`➕ ${n} task${n === 1 ? "" : "s"}: ${names}${into ? " → " + into : ""}`, {
+    const w = r.wishes || [];
+    toast(n || !w.length ? `➕ ${n} task${n === 1 ? "" : "s"}: ${names}${into ? " → " + into : ""}${wishNote(r)}`
+      : `🎁 On the wishlist: ${w.map((x) => x.title).join(", ")}`, {
       ms: 8000,
       undo: async () => { await post(`/api/captures/${r.capture_id}/undo`); load(); },
     });
@@ -533,6 +541,83 @@ $("#done-card").addEventListener("click", async () => {
 $("#done-prev").addEventListener("click", () => shiftDoneDay(-1));
 $("#done-next").addEventListener("click", () => shiftDoneDay(1));
 
+// ---------- wishlist ----------
+const wishNote = (r) => (r.wishes?.length ? ` · 🎁 ${r.wishes.length} on the wishlist` : "");
+let wishEditing = null;
+async function renderWishes() {
+  const [want, got] = await Promise.all([api("/api/wishes"), api("/api/wishes?status=got")]);
+  const patch = async (w, body, msg) => {
+    await api(`/api/wishes/${w.id}`, { method: "PATCH", body });
+    if (msg) toast(msg, { undo: async () => { await api(`/api/wishes/${w.id}`, { method: "PATCH", body: { status: w.status } }); load(); } });
+    load();
+  };
+  const item = (w) => {
+    if (wishEditing === w.id) return wishEditor(w);
+    const age = Math.floor((Date.now() - new Date(w.created_at)) / 864e5);
+    const sub = [w.price, w.note, w.status === "got" ? null : age > 0 ? `added ${age}d ago` : "added today"].filter(Boolean).join(" · ");
+    return h("li", {},
+      h("div", { class: "t", title: "Edit", onclick: () => { wishEditing = w.id; renderWishes(); } },
+        w.status === "got" ? "✓ " : "", w.title,
+        sub ? h("div", { class: "sub" }, sub) : null),
+      w.link ? h("a", { class: "btn", href: w.link, target: "_blank", rel: "noopener noreferrer", title: w.link }, "🔗") : null,
+      w.status === "want"
+        ? h("button", { type: "button", title: "Got it", onclick: () => patch(w, { status: "got" }, `🎁 Got ${w.title}. Enjoy it.`) }, "🎁 Got it")
+        : h("button", { type: "button", title: "Still want it", onclick: () => patch(w, { status: "want" }) }, "↩️"),
+      h("button", { type: "button", title: "Don't want it any more", onclick: async () => {
+        await api(`/api/wishes/${w.id}`, { method: "DELETE" });
+        toast(`🗑 ${w.title} removed`, { undo: async () => { await post("/api/wishes", { title: [w.title, w.price, w.link].filter(Boolean).join(" "), note: w.note }); load(); } });
+        load();
+      } }, "🗑"));
+  };
+  $("#wish-list").replaceChildren(...(want.length ? want.map(item)
+    : [h("li", { class: "muted" }, "Nothing yet. Type above, or put “wish: …” or a “Wishlist:” heading in a brain dump.")]));
+  $("#wish-got-box").hidden = !got.length;
+  $("#wish-got-h").textContent = `Got (${got.length})`;
+  $("#wish-got").replaceChildren(...got.map(item));
+}
+function wishEditor(w) {
+  const f = (name, value, placeholder, attrs = {}) => h("input", { name, value: value || "", placeholder, ...attrs });
+  const box = h("li", { class: "wish-edit" },
+    f("title", w.title, "What is it?", { maxlength: 120 }),
+    f("price", w.price, "Price", { maxlength: 20 }),
+    f("link", w.link, "Link (https://…)", { type: "url", maxlength: 500 }),
+    f("note", w.note, "Note (size, colour, why…)", { maxlength: 500 }));
+  const save = async () => {
+    const body = Object.fromEntries([...box.querySelectorAll("input")].map((i) => [i.name, i.value.trim()]));
+    try { await api(`/api/wishes/${w.id}`, { method: "PATCH", body }); wishEditing = null; load(); }
+    catch (e) { toast("Couldn't save: " + e.message); }
+  };
+  box.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); save(); }
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); wishEditing = null; renderWishes(); }
+  });
+  box.append(h("div", { class: "row" }, h("span", { class: "spacer" }),
+    h("button", { type: "button", onclick: () => { wishEditing = null; renderWishes(); } }, "Cancel"),
+    h("button", { type: "button", class: "primary", onclick: save }, "Save")));
+  setTimeout(() => box.querySelector("input").focus());
+  return box;
+}
+async function openWishlist() {
+  wishEditing = null;
+  await renderWishes();
+  if (!$("#wish-dlg").open) $("#wish-dlg").showModal();
+  $("#wish-add").focus();
+}
+$("#wish-card").addEventListener("click", openWishlist);
+$("#wish-add").addEventListener("keydown", async (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  e.stopPropagation();
+  const title = e.target.value.trim();
+  if (!title) return;
+  e.target.value = "";
+  try {
+    const w = await post("/api/wishes", { title });
+    toast(`🎁 On the wishlist: ${w.title}${w.price ? " · " + w.price : ""}`);
+  } catch (err) { e.target.value = title; toast("Couldn't add that: " + err.message); }
+  load();
+});
+
 async function openSomeday() {
   const items = await api("/api/tasks?status=someday");
   $("#someday-list").replaceChildren(...(items.length ? items.map((t) => h("li", {},
@@ -777,7 +862,7 @@ async function toggleVoice() {
     $("#capture-status").textContent = "🎙 Listening back…";
     try {
       const r = await api(`/api/capture/voice?x=1${modeQS()}`, { method: "POST", body: new Blob(chunks, { type }), headers: { "Content-Type": type } });
-      toast(h("span", {}, h("i", {}, `“${r.heard}”`), ` → ${r.tasks.length} task${r.tasks.length === 1 ? "" : "s"}`), {
+      toast(h("span", {}, h("i", {}, `“${r.heard}”`), ` → ${r.tasks.length} task${r.tasks.length === 1 ? "" : "s"}${wishNote(r)}`), {
         ms: 8000, undo: async () => { await post(`/api/captures/${r.capture_id}/undo`); load(); } });
     } catch (e) { toast("Voice failed: " + e.message); }
     load();
@@ -843,7 +928,7 @@ function dumpBox(placeholder) {
   return { el: ta, async save() {
     if (!ta.value.trim()) return;
     const r = await post("/api/capture?wait=1", { text: ta.value });
-    toast(`➕ ${r.tasks.length} task${r.tasks.length === 1 ? "" : "s"} captured`);
+    toast(`➕ ${r.tasks.length} task${r.tasks.length === 1 ? "" : "s"} captured${wishNote(r)}`);
   } };
 }
 
@@ -1493,6 +1578,7 @@ document.addEventListener("keydown", (e) => {
   if (e.target.closest("input, textarea, select, dialog")) return;
   if (e.key === "/") { e.preventDefault(); input.focus(); }
   else if (e.key === "n") { e.preventDefault(); openEdit(null); }
+  else if (e.key === "w") { e.preventDefault(); openWishlist(); }
   else if (e.key === "d") setDisplay(!document.body.classList.contains("display"));
   else if (e.key === "t") toggleTheme();
   else if (e.key === "e" && board) post("/api/energy", { level: (board.energy.level % 3) + 1 }).then(load);

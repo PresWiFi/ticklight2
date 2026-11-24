@@ -66,6 +66,7 @@
     <h2 class="projects-h">Projects</h2>
     <div id="projects" class="projects"></div>
     <button type="button" id="done-card" class="pcard done-card" title="See everything you finished"></button>
+    <button type="button" id="wish-card" class="pcard done-card wish-card" title="Things you want but can't get yet (w)"></button>
   </section>
 
   <section id="list-col">
@@ -215,6 +216,17 @@
       <button type="button" id="done-next" title="Day after">›</button>
     </div>
     <ul id="done-list" class="list"></ul>
+    <div class="row"><span class="spacer"></span><button class="primary">Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="wish-dlg">
+  <form method="dialog">
+    <h2>🎁 Wishlist</h2>
+    <p class="muted small">Things you want but can't get yet. Out of your head, not forgotten. Nothing here is a task. Add a price or link and it's picked out.</p>
+    <input id="wish-add" maxlength="600" autocomplete="off" placeholder="What do you want? Enter adds it">
+    <ul id="wish-list" class="list"></ul>
+    <details id="wish-got-box" hidden><summary class="muted small" id="wish-got-h"></summary><ul id="wish-got" class="list"></ul></details>
     <div class="row"><span class="spacer"></span><button class="primary">Close</button></div>
   </form>
 </dialog>

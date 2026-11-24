@@ -21,6 +21,10 @@ A self-hosted ADHD task system for an always-on desk monitor, your phone, your w
 - **Project mode.** 🎯 in a project narrows the whole dashboard (Focus, lists, desk monitor) to that
   project, plus today's appointments so nothing timed gets missed. The capture box and 🎙 add to it.
   **Show everything** in the banner ends it. It follows you across devices.
+- **Wishlist.** 🎁 under Focus (or `w`): things you want but can't get yet, kept out of your tasks so
+  they never nag. Type a name and Enter; a price (`£90`) or link in it is split out. Brain dumps send
+  "I want a new keyboard" there, as do a `Wishlist:` heading or a `wish: …` line without AI. 🎁 Got it
+  moves it to a Got list. Telegram: `/wish headphones £80`, or `/wish` to list.
 - **Today's three.** 📌 up to three picks a day; they lead Focus.
 - **Routines.** ☀️ Morning launch (meds, energy, pick today's three, brain dump), 🌙 evening shutdown
   (what you did, park leftovers, brain dump, tomorrow's first thing), 🧹 weekly reset (one decision
@@ -56,7 +60,7 @@ A self-hosted ADHD task system for an always-on desk monitor, your phone, your w
   notifications, a Focus widget, a share target and a quick settings tile. See [android/README.md](android/README.md).
   Or install the web app from Chrome (⋮ → Add to home screen) for Web Push notifications.
 - **Telegram.** Send text or a voice note to capture it. `/focus`, `/energy`, `/today`, `/someday`,
-  `/session`, `/hyperfocus`. Gets the same notifications as the phone (toggle per channel in ⚙ → Notifications).
+  `/session`, `/hyperfocus`, `/wish`. Gets the same notifications as the phone (toggle per channel in ⚙ → Notifications).
 - **Alexa.** "Alexa, tell Tick Light to add buy milk tomorrow" · "…ask Tick Light what's next" ·
   "…tell Tick Light I finished the dishes" · "…I took my meds" · "…start a 25 minute focus".
 - **Galaxy Watch.** Double-press the home key, speak, done. See [watch/README.md](watch/README.md).
@@ -190,7 +194,7 @@ Any message is captured. Reply to a task message to add steps. Buttons: ✅ done
 
 ## Keyboard
 
-`/` capture · `v` voice · `s` focus session · `g` collection · `n` new task · `e` cycle energy · `h` hyperfocus · `d` display mode ·
+`/` capture · `v` voice · `s` focus session · `g` collection · `n` new task · `w` wishlist · `e` cycle energy · `h` hyperfocus · `d` display mode ·
 `t` light/dark · `Esc` clear.
 
 ## Tests

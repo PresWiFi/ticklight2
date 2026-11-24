@@ -45,6 +45,21 @@ CREATE TABLE IF NOT EXISTS projects (
 );
 CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id, status);
 
+CREATE TABLE IF NOT EXISTS wishes (
+    id          INTEGER PRIMARY KEY,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title       TEXT NOT NULL,
+    price       TEXT NOT NULL DEFAULT '',
+    link        TEXT NOT NULL DEFAULT '',
+    note        TEXT NOT NULL DEFAULT '',
+    status      TEXT NOT NULL DEFAULT 'want',       -- want | got
+    capture_id  INTEGER REFERENCES captures(id) ON DELETE SET NULL,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    got_at      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_wishes_user ON wishes(user_id, status);
+
 CREATE TABLE IF NOT EXISTS tasks (
     id             INTEGER PRIMARY KEY,
     user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

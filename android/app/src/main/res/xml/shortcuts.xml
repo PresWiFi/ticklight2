@@ -9,6 +9,11 @@
         <intent android:action="app.ticklight.phone.QUICK_ADD"
             android:targetPackage="app.ticklight.phone" android:targetClass="app.ticklight.phone.QuickAddActivity" />
     </shortcut>
+    <shortcut android:shortcutId="wish" android:enabled="true"
+        android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/wish_add">
+        <intent android:action="app.ticklight.phone.WISH_ADD"
+            android:targetPackage="app.ticklight.phone" android:targetClass="app.ticklight.phone.QuickAddActivity" />
+    </shortcut>
     <shortcut android:shortcutId="session" android:enabled="true"
         android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/start_session">
         <intent android:action="app.ticklight.phone.SESSION"

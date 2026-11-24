@@ -47,6 +47,9 @@ class Api(context: Context) {
     fun capture(text: String, source: String = "android") =
         JSONObject(call("POST", "/api/capture?source=$source", text, "text/plain"))
 
+    /** Name may carry a price and a link; the server splits them out. */
+    fun wish(text: String) = JSONObject(post("/api/wishes", JSONObject().put("title", text)))
+
     fun subscribePush() {
         if (store.endpoint.isEmpty()) return
         val sub = JSONObject()

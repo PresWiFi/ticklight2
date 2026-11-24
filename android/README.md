@@ -4,8 +4,10 @@ The full Ticklight app in its own WebView, so Chrome's screen time limit doesn't
 
 - **Notifications** with working buttons (Done, Took them, Snooze…) via UnifiedPush
 - **Widget**: top 3 of Focus, tick them off from the home screen, 🎤 and + to capture
-- **Quick add**: long-press the icon (Voice add, Quick add, Focus session), the share sheet
+- **Quick add**: long-press the icon (Voice add, Quick add, Add wish, Focus session), the share sheet
   ("Add to Ticklight"), or the quick settings tile
+- **Wishlist**: share a product from any shop app and pick "Add to wishlist"; trim the name, tap Add.
+  The link (and a £/$/€ price, if in the text) is kept
 - Mic permission for voice capture in the app
 
 ## Install

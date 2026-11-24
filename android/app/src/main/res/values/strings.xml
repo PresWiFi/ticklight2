@@ -4,5 +4,7 @@
     <string name="voice_add">Voice add</string>
     <string name="start_session">Focus session</string>
     <string name="share_label">Add to Ticklight</string>
+    <string name="wish_share_label">Add to wishlist</string>
+    <string name="wish_add">Add wish</string>
     <string name="widget_label">Ticklight: next up</string>
 </resources>

@@ -54,9 +54,23 @@
             <intent-filter>
                 <action android:name="app.ticklight.phone.QUICK_ADD" />
                 <action android:name="app.ticklight.phone.VOICE_ADD" />
+                <action android:name="app.ticklight.phone.WISH_ADD" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!-- Second share-sheet entry: shopping apps' "Share" puts the product on the wishlist -->
+        <activity-alias
+            android:name=".WishShare"
+            android:targetActivity=".QuickAddActivity"
+            android:exported="true"
+            android:label="@string/wish_share_label">
+            <intent-filter android:label="@string/wish_share_label">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
 
         <service
             android:name=".PushReceiver"
